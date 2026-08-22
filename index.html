@@ -471,19 +471,33 @@
             if(!code || !name || unitWeight <= 0) return alert('กรุณากรอกข้อมูลพัสดุให้ครบถ้วน');
 
             saveBtn.disabled = true;
-            saveBtn.innerText = 'กำลังอัปโหลดและบันทึก...';
+            saveBtn.innerText = 'กำลังประมวลผลและบันทึก...';
 
             try {
                 let finalImageUrl = existingImageUrl;
 
-                // ถ้ามีการเลือกไฟล์รูปภาพใหม่ ให้อัปโหลดขึ้น Storage
+                // แปลงรูปเป็น Base64 แทนการอัปโหลดไป Storage เพื่อเลี่ยงปัญหา CORS
                 if(fileInput.files && fileInput.files[0]) {
-                    const file = fileInput.files[0];
-                    // สร้างชื่อไฟล์ไม่ให้ซ้ำกัน
-                    const storageRef = storage.ref(`inventory_images/${Date.now()}_${file.name}`);
-                    const uploadTask = await storageRef.put(file);
-                    finalImageUrl = await uploadTask.ref.getDownloadURL();
+                    finalImageUrl = await fileToBase64(fileInput.files[0]);
                 }
+
+                const newItem = { code, name, unitWeight, image: finalImageUrl };
+
+                if (editId) {
+                    await db.collection('masterDb').doc(editId).update(newItem);
+                } else {
+                    await db.collection('masterDb').add(newItem);
+                }
+                
+                resetDbForm();
+            } catch(e) { 
+                console.error(e); 
+                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล'); 
+            } finally { 
+                saveBtn.disabled = false; 
+                saveBtn.innerText = 'บันทึกเข้าคลังข้อมูล'; 
+            }
+        }
 
                 const newItem = { code, name, unitWeight, image: finalImageUrl };
 
