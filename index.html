@@ -20,8 +20,6 @@
         }
         .brand-yellow { background-color: #F5B837; }
         .brand-yellow-light { background-color: #FEF3D6; }
-        .brand-navy { color: #1E293B; }
-        .border-navy { border-color: #1E293B; }
         @media print { .no-print { display: none !important; } }
     </style>
 </head>
@@ -43,9 +41,7 @@
                     </svg>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
-                        ชั่งดี
-                     </h1>
+                    <h1 class="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">ชั่งดี</h1>
                     <p class="text-xs font-semibold text-slate-800">ระบบคำนวณและสแกนน้ำหนักเศษเหล็ก</p>
                 </div>
             </div>
@@ -82,7 +78,6 @@
                     <button onclick="window.print()" class="no-print px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-800 transition">🖨️ พิมพ์ / บันทึก PDF</button>
                 </div>
 
-                <!-- กล่องสแกน AI -->
                 <div class="mb-6 brand-yellow-light p-4 rounded-2xl border-2 border-slate-900 no-print">
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">📷 สแกนเอกสารรื้อถอนด้วย AI</h3>
@@ -99,7 +94,6 @@
                     <p id="scanStatus" class="text-xs text-slate-900 font-bold mt-2 hidden"></p>
                 </div>
 
-                <!-- เพิ่มรายการด้วยมือ -->
                 <div class="mb-6 bg-slate-50 p-4 rounded-2xl border-2 border-slate-900 no-print">
                     <h3 class="text-sm font-bold text-slate-900 mb-3">➕ เพิ่มรายการด้วยมือ</h3>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -117,7 +111,6 @@
                     <button onclick="addItemToFolder()" id="addItemBtn" class="mt-3 w-full bg-slate-900 text-white font-bold text-sm py-2.5 px-4 rounded-xl cursor-pointer hover:bg-slate-800 transition">เพิ่มเข้าแฟ้ม</button>
                 </div>
 
-                <!-- ตารางรายการ -->
                 <div class="overflow-x-auto mb-6 rounded-2xl border-2 border-slate-900">
                     <table class="w-full text-left border-collapse">
                         <thead>
@@ -132,7 +125,6 @@
                     </table>
                 </div>
 
-                <!-- การ์ดน้ำหนักรวม -->
                 <div class="brand-yellow text-slate-900 p-5 rounded-2xl border-2 border-slate-900 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(30,41,59,1)]">
                     <span class="text-base font-bold">น้ำหนักรวมเศษเหล็กทั้งสิ้น:</span>
                     <div class="text-right">
@@ -194,9 +186,6 @@
     </div>
 
     <script>
-        // ----------------------------------------------------
-        // ส่วนตั้งค่าระบบ Firebase
-        // ----------------------------------------------------
         const firebaseConfig = {
             apiKey: "AIzaSyB0-yYa0NSsVqWK1RgOr9APavwJkFklu9A",
             authDomain: "changdee-pea.firebaseapp.com",
@@ -216,7 +205,6 @@
         let selectedUnitWeight = 0;
         const aiApiKey = 'AIzaSyD7CZEJ3TPusWj3QWi-h48iDnvvmEnVDlg';
 
-        // Listeners: อ่านข้อมูลอัตโนมัติจาก Firestore แบบเรียลไทม์
         db.collection('folders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
             folders = [];
             snapshot.forEach(doc => folders.push({ id: doc.id, ...doc.data() }));
@@ -231,10 +219,6 @@
             updateDatalist();
         });
 
-
-        // ----------------------------------------------------
-        // ระบบนำทาง Navigation
-        // ----------------------------------------------------
         function navTo(page) {
             document.getElementById('pageFolders').classList.add('hidden');
             document.getElementById('pageCalc').classList.add('hidden');
@@ -257,9 +241,6 @@
             }
         }
 
-        // ----------------------------------------------------
-        // จัดการแฟ้มงาน (Firestore)
-        // ----------------------------------------------------
         async function createFolder() {
             const nameInput = document.getElementById('newFolderName');
             const name = nameInput.value.trim();
@@ -299,7 +280,8 @@
             }
 
             folders.forEach(f => {
-                const totalWeight = f.items.reduce((sum, item) => sum + item.weight, 0);
+                const totalWeight = f.items ? f.items.reduce((sum, item) => sum + item.weight, 0) : 0;
+                const itemLength = f.items ? f.items.length : 0;
                 container.innerHTML += `
                     <div class="border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition flex flex-col justify-between">
                         <div>
@@ -307,7 +289,7 @@
                                 <h3 class="font-bold text-slate-900 text-base leading-tight">${f.name}</h3>
                                 <button onclick="deleteFolder('${f.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold whitespace-nowrap ml-2 cursor-pointer">ลบ</button>
                             </div>
-                            <p class="text-xs font-semibold text-slate-500 mb-4">${f.items.length} รายการ</p>
+                            <p class="text-xs font-semibold text-slate-500 mb-4">${itemLength} รายการ</p>
                         </div>
                         <div class="flex justify-between items-center pt-3 border-t-2 border-slate-100">
                             <span class="text-sm font-black text-slate-900">${totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2})} กก.</span>
@@ -318,10 +300,6 @@
             });
         }
 
-
-        // ----------------------------------------------------
-        // หน้าคำนวณ (Firestore + AI)
-        // ----------------------------------------------------
         function renderCalcView() {
             const folder = folders.find(f => f.id === currentFolderId);
             if(!folder) return navTo('folders');
@@ -332,23 +310,23 @@
             tbody.innerHTML = '';
             let totalWeight = 0;
 
-            if(folder.items.length === 0) {
+            if(!folder.items || folder.items.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</td></tr>`;
+            } else {
+                folder.items.forEach((item, index) => {
+                    totalWeight += item.weight;
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-3 text-slate-900">${item.name}</td>
+                            <td class="p-3 text-center text-slate-700">${item.qty}</td>
+                            <td class="p-3 text-right font-bold text-slate-900">${item.weight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td class="p-3 text-center no-print">
+                                <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer">ลบ</button>
+                            </td>
+                        </tr>
+                    `;
+                });
             }
-
-            folder.items.forEach((item, index) => {
-                totalWeight += item.weight;
-                tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50">
-                        <td class="p-3 text-slate-900">${item.name}</td>
-                        <td class="p-3 text-center text-slate-700">${item.qty}</td>
-                        <td class="p-3 text-right font-bold text-slate-900">${item.weight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                        <td class="p-3 text-center no-print">
-                            <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer">ลบ</button>
-                        </td>
-                    </tr>
-                `;
-            });
 
             document.getElementById('folderTotalWeight').innerText = totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
@@ -365,7 +343,8 @@
             btn.disabled = true;
             btn.innerText = 'กำลังเพิ่ม...';
             try {
-                const newItems = [...folder.items, { name, qty, weight }];
+                const existingItems = folder.items || [];
+                const newItems = [...existingItems, { name, qty, weight }];
                 await db.collection('folders').doc(currentFolderId).update({ items: newItems });
                 
                 document.getElementById('calcItemName').value = '';
@@ -399,6 +378,7 @@
             }
         }
 
+        // เพิ่ม async ตรงนี้เรียบร้อยครับ
         async function scanDocumentWithAI() {
             const fileInput = document.getElementById('scanDocInput');
             if(!fileInput.files || !fileInput.files[0]) return alert('กรุณาเลือกหรือถ่ายรูปภาพเอกสารก่อนครับ');
@@ -443,7 +423,8 @@
                     addedCount++;
                 });
 
-                await db.collection('folders').doc(currentFolderId).update({ items: [...folder.items, ...newItemsToAdd] });
+                const existingItems = folder.items || [];
+                await db.collection('folders').doc(currentFolderId).update({ items: [...existingItems, ...newItemsToAdd] });
                 statusEl.innerText = `✅ เพิ่มรายการจากสแกนสำเร็จ ${addedCount} รายการ`;
 
             } catch (err) {
@@ -455,10 +436,6 @@
             }
         }
 
-
-        // ----------------------------------------------------
-        // คลังพัสดุ (Firestore + Base64 Upload)
-        // ----------------------------------------------------
         async function saveToMasterDb() {
             const code = document.getElementById('dbCode').value.trim();
             const name = document.getElementById('dbName').value.trim();
@@ -476,7 +453,6 @@
             try {
                 let finalImageUrl = existingImageUrl;
 
-                // แปลงรูปเป็น Base64 แทนการอัปโหลดไป Storage เพื่อเลี่ยงปัญหา CORS
                 if(fileInput.files && fileInput.files[0]) {
                     finalImageUrl = await fileToBase64(fileInput.files[0]);
                 }
@@ -545,7 +521,7 @@
         }
 
         async function deleteDbItem(id) {
-            if(confirm('ต้องการลบพัสดุนี้ออกจากคลัง? (หากมีรูปภาพ รูปในระบบอาจไม่ถูกลบไปด้วย)')) {
+            if(confirm('ต้องการลบพัสดุนี้ออกจากคลัง?')) {
                 await db.collection('masterDb').doc(id).delete();
             }
         }
@@ -564,9 +540,6 @@
             document.getElementById('cancelEditBtn').classList.add('hidden');
         }
 
-        // ----------------------------------------------------
-        // ส่วนเสริมอื่นๆ (UI, Modal)
-        // ----------------------------------------------------
         function updateDatalist() {
             const list = document.getElementById('masterDatalist');
             list.innerHTML = '';
