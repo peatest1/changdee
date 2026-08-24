@@ -216,11 +216,10 @@
     const db = firebase.firestore();
 
     // ⚡ แก้แจ้งเตือนสีเหลืองใน Console ด้วยการเพิ่ม merge: true
-    db.settings({
-        experimentalAutoDetectLongPolling: true,
-        useFetchStreams: false,
-        merge: true 
-    });
+   db.settings({
+    experimentalAutoDetectLongPolling: true,
+    useFetchStreams: false
+});
 
     let folders = [];
     let masterDb = [];
@@ -481,10 +480,11 @@ async function scanDocumentWithAI() {
             const base64Data = base64Image.split(',')[1];
             
             // ⚡ อัปเดตชื่อโมเดลเป็น gemini-3.6-flash ตามที่ API แจ้งแนะนำ
-            const modelName = "gemini-3.6-flash";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
+// ✅ แก้ไขแล้ว: เปลี่ยนชื่อโมเดล และปรับ Casing ของ JSON Body
+const modelName = "gemini-2.5-flash"; 
+const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
 
-            const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
+const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
 1. 'code': คอลัมน์รหัสพัสดุ (เช่น 1-00-001-0004 NA)
 2. 'name': คอลัมน์รายการพัสดุ (เช่น POLE 12 M.)
 3. 'qty': คอลัมน์ "จำนวนพัสดุตามประมาณการ" (เอาเฉพาะที่เป็นตัวเลข)
@@ -492,25 +492,33 @@ async function scanDocumentWithAI() {
 ตอบกลับเฉพาะรูปแบบ JSON เท่านั้น ห้ามมีข้อความอื่น:
 {"items": [{"code": "1-00-001-0004 NA", "name": "POLE 12 M.", "qty": 22}]}`;
 
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [ { text: prompt }, { inline_data: { mime_type: fileInput.files[0].type, data: base64Data } } ]}],
-                    generationConfig: { response_mime_type: "application/json" }
-                })
-            });
+const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        contents: [{ 
+            parts: [ 
+                { text: prompt }, 
+                { inlineData: { mimeType: fileInput.files[0].type, data: base64Data } } 
+            ]
+        }],
+        generationConfig: { responseMimeType: "application/json" }
+    })
+});
 
-            if (!response.ok) {
-                const errText = await response.text();
-                console.error("API Detail Error:", errText);
-                throw new Error(`API Error ${response.status}`);
-            }
-            
-            const data = await response.json();
-            const textResult = data.candidates[0].content.parts[0].text;
-            
-            const parsedData = JSON.parse(textResult);
+if (!response.ok) {
+    const errText = await response.text();
+    console.error("API Detail Error:", errText);
+    throw new Error(`API Error ${response.status}`);
+}
+
+const data = await response.json();
+let textResult = data.candidates[0].content.parts[0].text;
+
+// ลบ Markdown Tag ออกเพื่อกัน Error ตอนสั่ง JSON.parse
+textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
+
+const parsedData = JSON.parse(textResult);
             const scannedItems = parsedData.items || [];
 
             if(scannedItems.length === 0) {
