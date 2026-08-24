@@ -426,26 +426,34 @@
     }
 
   function onItemSelect(val) {
+        // ลบขีดและเว้นวรรคออกเพื่อเทียบตัวอักษร
         const cleanVal = val.replace(/-/g, '').toLowerCase().trim();
+        if (!cleanVal) {
+            selectedUnitWeight = 0;
+            return;
+        }
+
+        // ⚡ แก้ไขใหม่: ใช้ === แทน .includes() เพื่อให้ต้องพิมพ์ตรงเป๊ะๆ หรือเลือกจาก Dropdown เท่านั้น
         const found = masterDb.find(d => {
             const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
             const fullText = `[${d.code}] ${d.name}`.toLowerCase();
-            const cleanFullText = fullText.replace(/-/g, '');
-            return cleanCode === cleanVal || d.name.toLowerCase().includes(val.toLowerCase()) || cleanFullText.includes(cleanVal);
+            
+            // ตรวจสอบว่าตรงกับรหัส (แบบตัดขีด) หรือ ตรงกับชื่อเต็มที่เลือกมาจาก Dropdown
+            return cleanCode === cleanVal || fullText === val.toLowerCase();
         });
 
         if (found) {
             selectedUnitWeight = found.unitWeight;
             
-            // ⚡ เปลี่ยนข้อความในช่องกรอกเป็นชื่อเต็มแบบสมบูรณ์
+            // ⚡ เปลี่ยนข้อความในช่องกรอกเป็นชื่อเต็ม เมื่อข้อมูลตรงแบบเป๊ะๆ แล้วเท่านั้น
             document.getElementById('calcItemName').value = `[${found.code}] ${found.name}`; 
             
             calculateRowWeight();
         } else {
+            // ถ้าระหว่างพิมพ์ยังไม่เจอแบบเป๊ะๆ ให้เซ็ตน้ำหนักเป็น 0 รอไว้ก่อน
             selectedUnitWeight = 0;
         }
     }
-
     function calculateRowWeight() {
         if (selectedUnitWeight > 0) {
             const qty = parseFloat(document.getElementById('calcItemQty').value) || 0;
