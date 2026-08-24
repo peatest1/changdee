@@ -472,7 +472,7 @@
             const base64Data = base64Image.split(',')[1];
             
             // ⚡ กำหนดชื่อโมเดลเป็น gemini-2.5-flash
-            const modelName = "gemini-2.5-flash";
+            const modelName = "gemini-3.6-flash";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
 
             const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
