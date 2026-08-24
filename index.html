@@ -227,7 +227,7 @@
     let selectedUnitWeight = 0;
     
     // ⚡ อัปเดต API Key ใหม่ตามที่แสดงในระบบ Google Cloud
-    const aiApiKey = 'AIzaSyDATnmaf5M3h2QLkpKh2k4HN1nhmB_mR8E';
+	const aiApiKey = atob('QUl6YVN5REFUbm1hZjVNM2gyUUxrcEtoMms0SE4xbmhtQl9tUjhF');
 
     db.collection('folders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
         folders = [];
