@@ -202,7 +202,7 @@
         </div>
     </div>
 
-   <script>
+<script>
     const firebaseConfig = {
         apiKey: "AIzaSyB0-yYa0NSsVqWK1RgOr9APavwJkFklu9A",
         authDomain: "changdee-pea.firebaseapp.com",
@@ -215,10 +215,11 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // ⚡ แก้ปัญหา QUIC Protocol Error & Network Timeout
+    // ⚡ แก้แจ้งเตือนสีเหลืองใน Console ด้วยการเพิ่ม merge: true
     db.settings({
         experimentalAutoDetectLongPolling: true,
-        useFetchStreams: false
+        useFetchStreams: false,
+        merge: true 
     });
 
     let folders = [];
@@ -227,7 +228,6 @@
     let selectedUnitWeight = 0;
     const aiApiKey = 'AIzaSyD7CZEJ3TPusWj3QWi-h48iDnvvmEnVDlg';
 
-    // โหลดข้อมูลแฟ้มงานแบบ Realtime
     db.collection('folders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
         folders = [];
         snapshot.forEach(doc => folders.push({ id: doc.id, ...doc.data() }));
@@ -235,7 +235,6 @@
         if (currentFolderId && !document.getElementById('pageCalc').classList.contains('hidden')) renderCalcView();
     }, error => console.error("Firestore Folders Error:", error));
 
-    // ⚡ ปรับเป็น fetch แบบครั้งเดียวเพื่อไม่ให้ WebSockets ดึง Base64 หนักเกินไป
     async function fetchMasterDb() {
         try {
             const snapshot = await db.collection('masterDb').get();
@@ -248,7 +247,6 @@
         }
     }
 
-    // โหลด Master DB ครั้งแรกเมื่อเปิดเว็บ
     fetchMasterDb();
 
     function navTo(page) {
@@ -303,18 +301,19 @@
         }
     }
 
+    // ⚡ อัปเดตประสิทธิภาพการวาดหน้าจอแฟ้มงาน
     function renderFolders() {
         const container = document.getElementById('foldersList');
-        container.innerHTML = '';
         if(folders.length === 0) {
             container.innerHTML = `<div class="col-span-full text-center text-slate-400 font-bold py-12">ยังไม่มีแฟ้มงาน กรุณาสร้างแฟ้มงานใหม่</div>`;
             return;
         }
 
+        let htmlContent = '';
         folders.forEach(f => {
             const totalWeight = f.items ? f.items.reduce((sum, item) => sum + item.weight, 0) : 0;
             const itemLength = f.items ? f.items.length : 0;
-            container.innerHTML += `
+            htmlContent += `
                 <div class="border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition flex flex-col justify-between">
                     <div>
                         <div class="flex justify-between items-start mb-2">
@@ -330,24 +329,25 @@
                 </div>
             `;
         });
+        container.innerHTML = htmlContent;
     }
 
+    // ⚡ อัปเดตประสิทธิภาพการวาดหน้าจอคำนวณ
     function renderCalcView() {
         const folder = folders.find(f => f.id === currentFolderId);
         if(!folder) return navTo('folders');
 
         document.getElementById('calcFolderName').innerText = `แฟ้มงาน: ${folder.name}`;
-
         const tbody = document.getElementById('calcItemList');
-        tbody.innerHTML = '';
         let totalWeight = 0;
 
         if(!folder.items || folder.items.length === 0) {
             tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</td></tr>`;
         } else {
+            let htmlContent = '';
             folder.items.forEach((item, index) => {
                 totalWeight += item.weight;
-                tbody.innerHTML += `
+                htmlContent += `
                     <tr class="hover:bg-slate-50">
                         <td class="p-3 text-slate-900">${item.name}</td>
                         <td class="p-3 text-center text-slate-700">${item.qty}</td>
@@ -358,6 +358,7 @@
                     </tr>
                 `;
             });
+            tbody.innerHTML = htmlContent;
         }
 
         document.getElementById('folderTotalWeight').innerText = totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -510,7 +511,6 @@
 
         try {
             let finalImageUrl = existingImageUrl;
-
             if(fileInput.files && fileInput.files[0]) {
                 finalImageUrl = await fileToBase64(fileInput.files[0]);
             }
@@ -524,7 +524,7 @@
             }
             
             resetDbForm();
-            await fetchMasterDb(); // ⚡ โหลดคลังข้อมูลใหม่เมื่อบันทึก
+            await fetchMasterDb(); 
         } catch(e) { 
             console.error(e); 
             alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล'); 
@@ -534,12 +534,11 @@
         }
     }
 
+    // ⚡ อัปเดตประสิทธิภาพการวาดตารางค้นหา (แก้ปัญหาค้างตอนพิมพ์และกด)
     function renderMasterDb() {
         const tbody = document.getElementById('dbTableList');
         const searchVal = (document.getElementById('dbSearchInput')?.value || '').replace(/-/g, '').toLowerCase().trim();
         
-        tbody.innerHTML = '';
-
         let filteredDb = masterDb;
         if (searchVal) {
             filteredDb = masterDb.filter(d => {
@@ -554,15 +553,15 @@
             return;
         }
 
-        // ⚡ Limit แสดงผลแค่ 100 รายการแรกขณะค้นหาเพื่อไม่ให้ Dom ค้าง
         const displayList = filteredDb.slice(0, 100);
+        let htmlContent = ''; // ⚡ สร้าง String เตรียมไว้ ก่อนยัดลงหน้าจอ
 
         displayList.forEach((d) => {
             const imgTag = d.image 
                 ? `<img src="${d.image}" class="w-10 h-10 object-cover rounded-xl cursor-pointer border-2 border-slate-900" onclick="openModal('${d.id}')">`
                 : `<span class="text-xs text-slate-400">ไม่มีรูป</span>`;
 
-            tbody.innerHTML += `
+            htmlContent += `
                 <tr class="hover:bg-slate-50">
                     <td class="p-3 text-center">${imgTag}</td>
                     <td class="p-3 font-bold text-slate-900">${d.code}</td>
@@ -575,6 +574,8 @@
                 </tr>
             `;
         });
+
+        tbody.innerHTML = htmlContent; // ⚡ ยัดลงหน้าจอทีเดียวจบ ไม่กระตุกแล้ว
     }
 
     function editDbItem(id) {
