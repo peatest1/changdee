@@ -473,7 +473,6 @@ async function scanDocumentWithAI() {
         scanBtn.disabled = true;
 
         try {
-            // ตรวจสอบว่ามี API Key หรือไม่
             if (typeof aiApiKey === 'undefined' || !aiApiKey) {
                 throw new Error("ไม่พบ API Key กรุณาตรวจสอบการตั้งค่าตัวแปร aiApiKey");
             }
@@ -481,8 +480,8 @@ async function scanDocumentWithAI() {
             const base64Image = await fileToBase64(fileInput.files[0]);
             const base64Data = base64Image.split(',')[1];
             
-            // ⚡ เปลี่ยนมาใช้โมเดล gemini-2.5-flash หรือ gemini-2.0-flash
-            const modelName = "gemini-2.5-flash";
+            // ⚡ อัปเดตชื่อโมเดลเป็น gemini-3.6-flash ตามที่ API แจ้งแนะนำ
+            const modelName = "gemini-3.6-flash";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
 
             const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
@@ -505,7 +504,7 @@ async function scanDocumentWithAI() {
             if (!response.ok) {
                 const errText = await response.text();
                 console.error("API Detail Error:", errText);
-                throw new Error(`API Error ${response.status}: โปรดเช็คชื่อ Model หรือ API Key`);
+                throw new Error(`API Error ${response.status}`);
             }
             
             const data = await response.json();
