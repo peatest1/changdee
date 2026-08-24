@@ -370,12 +370,23 @@
         const qtyInput = document.getElementById('calcItemQty');
         const weightInput = document.getElementById('calcItemWeight');
         
-        const name = nameInput.value.trim();
+        let name = nameInput.value.trim(); // ⚡ เปลี่ยนจาก const เป็น let เพื่อให้แก้ไขข้อความได้
         const qty = parseFloat(qtyInput.value) || 1;
         const weight = parseFloat(weightInput.value) || 0;
         const btn = document.getElementById('addItemBtn');
 
         if(!name || weight <= 0) return alert('กรุณากรอกรายการและน้ำหนักให้ถูกต้อง');
+
+        // ⚡ เพิ่มเงื่อนไข: ตรวจสอบถ้าระบุแค่รหัส ให้ดึงชื่อเต็มมาประกอบร่าง
+        const cleanInput = name.replace(/-/g, '').toLowerCase().trim();
+        const found = masterDb.find(d => {
+            const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
+            return cleanCode === cleanInput || name.includes(d.code);
+        });
+
+        if (found && !name.includes(found.name)) {
+            name = `[${found.code}] ${found.name}`;
+        }
 
         btn.disabled = true;
         btn.innerText = 'กำลังเพิ่ม...';
@@ -414,7 +425,7 @@
         await db.collection('folders').doc(currentFolderId).update({ items: newItems });
     }
 
-    function onItemSelect(val) {
+  function onItemSelect(val) {
         const cleanVal = val.replace(/-/g, '').toLowerCase().trim();
         const found = masterDb.find(d => {
             const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
@@ -425,6 +436,10 @@
 
         if (found) {
             selectedUnitWeight = found.unitWeight;
+            
+            // ⚡ เปลี่ยนข้อความในช่องกรอกเป็นชื่อเต็มแบบสมบูรณ์
+            document.getElementById('calcItemName').value = `[${found.code}] ${found.name}`; 
+            
             calculateRowWeight();
         } else {
             selectedUnitWeight = 0;
