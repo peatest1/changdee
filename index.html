@@ -202,426 +202,445 @@
         </div>
     </div>
 
-    <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyB0-yYa0NSsVqWK1RgOr9APavwJkFklu9A",
-            authDomain: "changdee-pea.firebaseapp.com",
-            projectId: "changdee-pea",
-            storageBucket: "changdee-pea.firebasestorage.app",
-            messagingSenderId: "54220082050",
-            appId: "1:54220082050:web:2b930984314c53cb5e9d9b"
-        };
-        
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const storage = firebase.storage();
+   <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyB0-yYa0NSsVqWK1RgOr9APavwJkFklu9A",
+        authDomain: "changdee-pea.firebaseapp.com",
+        projectId: "changdee-pea",
+        storageBucket: "changdee-pea.firebasestorage.app",
+        messagingSenderId: "54220082050",
+        appId: "1:54220082050:web:2b930984314c53cb5e9d9b"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-        let folders = [];
-        let masterDb = [];
-        let currentFolderId = null;
-        let selectedUnitWeight = 0;
-        const aiApiKey = 'AIzaSyD7CZEJ3TPusWj3QWi-h48iDnvvmEnVDlg';
+    // ⚡ แก้ปัญหา QUIC Protocol Error & Network Timeout
+    db.settings({
+        experimentalAutoDetectLongPolling: true,
+        useFetchStreams: false
+    });
 
-        db.collection('folders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
-            folders = [];
-            snapshot.forEach(doc => folders.push({ id: doc.id, ...doc.data() }));
-            if (!document.getElementById('pageFolders').classList.contains('hidden')) renderFolders();
-            if (currentFolderId && !document.getElementById('pageCalc').classList.contains('hidden')) renderCalcView();
-        });
+    let folders = [];
+    let masterDb = [];
+    let currentFolderId = null;
+    let selectedUnitWeight = 0;
+    const aiApiKey = 'AIzaSyD7CZEJ3TPusWj3QWi-h48iDnvvmEnVDlg';
 
-        db.collection('masterDb').onSnapshot(snapshot => {
+    // โหลดข้อมูลแฟ้มงานแบบ Realtime
+    db.collection('folders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+        folders = [];
+        snapshot.forEach(doc => folders.push({ id: doc.id, ...doc.data() }));
+        if (!document.getElementById('pageFolders').classList.contains('hidden')) renderFolders();
+        if (currentFolderId && !document.getElementById('pageCalc').classList.contains('hidden')) renderCalcView();
+    }, error => console.error("Firestore Folders Error:", error));
+
+    // ⚡ ปรับเป็น fetch แบบครั้งเดียวเพื่อไม่ให้ WebSockets ดึง Base64 หนักเกินไป
+    async function fetchMasterDb() {
+        try {
+            const snapshot = await db.collection('masterDb').get();
             masterDb = [];
             snapshot.forEach(doc => masterDb.push({ id: doc.id, ...doc.data() }));
             if (!document.getElementById('pageDb').classList.contains('hidden')) renderMasterDb();
             updateDatalist();
-        });
+        } catch (e) {
+            console.error("Fetch MasterDb Error:", e);
+        }
+    }
 
-        function navTo(page) {
-            document.getElementById('pageFolders').classList.add('hidden');
-            document.getElementById('pageCalc').classList.add('hidden');
-            document.getElementById('pageDb').classList.add('hidden');
+    // โหลด Master DB ครั้งแรกเมื่อเปิดเว็บ
+    fetchMasterDb();
 
-            document.getElementById('navFoldersBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5";
-            document.getElementById('navDbBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5";
+    function navTo(page) {
+        document.getElementById('pageFolders').classList.add('hidden');
+        document.getElementById('pageCalc').classList.add('hidden');
+        document.getElementById('pageDb').classList.add('hidden');
 
-            if(page === 'folders') {
-                document.getElementById('pageFolders').classList.remove('hidden');
-                document.getElementById('navFoldersBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
-                renderFolders();
-            } else if(page === 'db') {
-                document.getElementById('pageDb').classList.remove('hidden');
-                document.getElementById('navDbBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
-                renderMasterDb();
-            } else if(page === 'calc') {
-                document.getElementById('pageCalc').classList.remove('hidden');
-                renderCalcView();
-            }
+        document.getElementById('navFoldersBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5";
+        document.getElementById('navDbBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5";
+
+        if(page === 'folders') {
+            document.getElementById('pageFolders').classList.remove('hidden');
+            document.getElementById('navFoldersBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
+            renderFolders();
+        } else if(page === 'db') {
+            document.getElementById('pageDb').classList.remove('hidden');
+            document.getElementById('navDbBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
+            renderMasterDb();
+        } else if(page === 'calc') {
+            document.getElementById('pageCalc').classList.remove('hidden');
+            renderCalcView();
+        }
+    }
+
+    async function createFolder() {
+        const nameInput = document.getElementById('newFolderName');
+        const name = nameInput.value.trim();
+        const btn = document.getElementById('createFolderBtn');
+        if(!name) return alert('กรุณากรอกชื่อแฟ้มงาน');
+
+        btn.disabled = true;
+        btn.innerText = 'กำลังสร้าง...';
+        try {
+            await db.collection('folders').add({ 
+                name: name, 
+                items: [], 
+                createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+            });
+            nameInput.value = '';
+        } catch(e) { console.error(e); alert('เกิดข้อผิดพลาดในการสร้างแฟ้ม'); }
+        finally { btn.disabled = false; btn.innerText = 'สร้างแฟ้ม'; }
+    }
+
+    function openFolder(id) {
+        currentFolderId = id;
+        navTo('calc');
+    }
+
+    async function deleteFolder(id) {
+        if(confirm('ต้องการลบแฟ้มงานนี้ใช่หรือไม่? ข้อมูลจะถูกลบถาวร')) {
+            await db.collection('folders').doc(id).delete();
+        }
+    }
+
+    function renderFolders() {
+        const container = document.getElementById('foldersList');
+        container.innerHTML = '';
+        if(folders.length === 0) {
+            container.innerHTML = `<div class="col-span-full text-center text-slate-400 font-bold py-12">ยังไม่มีแฟ้มงาน กรุณาสร้างแฟ้มงานใหม่</div>`;
+            return;
         }
 
-        async function createFolder() {
-            const nameInput = document.getElementById('newFolderName');
-            const name = nameInput.value.trim();
-            const btn = document.getElementById('createFolderBtn');
-            if(!name) return alert('กรุณากรอกชื่อแฟ้มงาน');
-
-            btn.disabled = true;
-            btn.innerText = 'กำลังสร้าง...';
-            try {
-                await db.collection('folders').add({ 
-                    name: name, 
-                    items: [], 
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp() 
-                });
-                nameInput.value = '';
-            } catch(e) { console.error(e); alert('เกิดข้อผิดพลาดในการสร้างแฟ้ม'); }
-            finally { btn.disabled = false; btn.innerText = 'สร้างแฟ้ม'; }
-        }
-
-        function openFolder(id) {
-            currentFolderId = id;
-            navTo('calc');
-        }
-
-        async function deleteFolder(id) {
-            if(confirm('ต้องการลบแฟ้มงานนี้ใช่หรือไม่? ข้อมูลจะถูกลบถาวร')) {
-                await db.collection('folders').doc(id).delete();
-            }
-        }
-
-        function renderFolders() {
-            const container = document.getElementById('foldersList');
-            container.innerHTML = '';
-            if(folders.length === 0) {
-                container.innerHTML = `<div class="col-span-full text-center text-slate-400 font-bold py-12">ยังไม่มีแฟ้มงาน กรุณาสร้างแฟ้มงานใหม่</div>`;
-                return;
-            }
-
-            folders.forEach(f => {
-                const totalWeight = f.items ? f.items.reduce((sum, item) => sum + item.weight, 0) : 0;
-                const itemLength = f.items ? f.items.length : 0;
-                container.innerHTML += `
-                    <div class="border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition flex flex-col justify-between">
-                        <div>
-                            <div class="flex justify-between items-start mb-2">
-                                <h3 class="font-bold text-slate-900 text-base leading-tight">${f.name}</h3>
-                                <button onclick="deleteFolder('${f.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold whitespace-nowrap ml-2 cursor-pointer">ลบ</button>
-                            </div>
-                            <p class="text-xs font-semibold text-slate-500 mb-4">${itemLength} รายการ</p>
+        folders.forEach(f => {
+            const totalWeight = f.items ? f.items.reduce((sum, item) => sum + item.weight, 0) : 0;
+            const itemLength = f.items ? f.items.length : 0;
+            container.innerHTML += `
+                <div class="border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-slate-900 text-base leading-tight">${f.name}</h3>
+                            <button onclick="deleteFolder('${f.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold whitespace-nowrap ml-2 cursor-pointer">ลบ</button>
                         </div>
-                        <div class="flex justify-between items-center pt-3 border-t-2 border-slate-100">
-                            <span class="text-sm font-black text-slate-900">${totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2})} กก.</span>
-                            <button onclick="openFolder('${f.id}')" class="px-3 py-1.5 brand-yellow border-2 border-slate-900 text-slate-900 rounded-xl text-xs font-bold cursor-pointer hover:bg-amber-400 transition">เปิดคำนวณ →</button>
-                        </div>
+                        <p class="text-xs font-semibold text-slate-500 mb-4">${itemLength} รายการ</p>
                     </div>
-                `;
-            });
-        }
+                    <div class="flex justify-between items-center pt-3 border-t-2 border-slate-100">
+                        <span class="text-sm font-black text-slate-900">${totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2})} กก.</span>
+                        <button onclick="openFolder('${f.id}')" class="px-3 py-1.5 brand-yellow border-2 border-slate-900 text-slate-900 rounded-xl text-xs font-bold cursor-pointer hover:bg-amber-400 transition">เปิดคำนวณ →</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
 
-        function renderCalcView() {
-            const folder = folders.find(f => f.id === currentFolderId);
-            if(!folder) return navTo('folders');
+    function renderCalcView() {
+        const folder = folders.find(f => f.id === currentFolderId);
+        if(!folder) return navTo('folders');
 
-            document.getElementById('calcFolderName').innerText = `แฟ้มงาน: ${folder.name}`;
+        document.getElementById('calcFolderName').innerText = `แฟ้มงาน: ${folder.name}`;
 
-            const tbody = document.getElementById('calcItemList');
-            tbody.innerHTML = '';
-            let totalWeight = 0;
+        const tbody = document.getElementById('calcItemList');
+        tbody.innerHTML = '';
+        let totalWeight = 0;
 
-            if(!folder.items || folder.items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</td></tr>`;
-            } else {
-                folder.items.forEach((item, index) => {
-                    totalWeight += item.weight;
-                    tbody.innerHTML += `
-                        <tr class="hover:bg-slate-50">
-                            <td class="p-3 text-slate-900">${item.name}</td>
-                            <td class="p-3 text-center text-slate-700">${item.qty}</td>
-                            <td class="p-3 text-right font-bold text-slate-900">${item.weight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                            <td class="p-3 text-center no-print">
-                                <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer">ลบ</button>
-                            </td>
-                        </tr>
-                    `;
-                });
-            }
-
-            document.getElementById('folderTotalWeight').innerText = totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        }
-
-        async function addItemToFolder() {
-            const folder = folders.find(f => f.id === currentFolderId);
-            const nameInput = document.getElementById('calcItemName');
-            const qtyInput = document.getElementById('calcItemQty');
-            const weightInput = document.getElementById('calcItemWeight');
-            
-            const name = nameInput.value.trim();
-            const qty = parseFloat(qtyInput.value) || 1;
-            const weight = parseFloat(weightInput.value) || 0;
-            const btn = document.getElementById('addItemBtn');
-
-            if(!name || weight <= 0) return alert('กรุณากรอกรายการและน้ำหนักให้ถูกต้อง');
-
-            btn.disabled = true;
-            btn.innerText = 'กำลังเพิ่ม...';
-            try {
-                const existingItems = folder.items || [];
-                const newItems = [...existingItems, { name, qty, weight }];
-                await db.collection('folders').doc(currentFolderId).update({ items: newItems });
-                
-                nameInput.value = '';
-                qtyInput.value = '1';
-                weightInput.value = '';
-                selectedUnitWeight = 0;
-                nameInput.focus();
-            } catch(e) { console.error(e); alert('อัปเดตข้อมูลล้มเหลว'); }
-            finally { btn.disabled = false; btn.innerText = 'เพิ่มเข้าแฟ้ม'; }
-        }
-
-        function handleNameKeydown(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('calcItemQty').focus();
-                document.getElementById('calcItemQty').select();
-            }
-        }
-
-        function handleQtyKeydown(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                addItemToFolder();
-            }
-        }
-
-        async function removeItemFromFolder(index) {
-            const folder = folders.find(f => f.id === currentFolderId);
-            const newItems = folder.items.filter((_, i) => i !== index);
-            await db.collection('folders').doc(currentFolderId).update({ items: newItems });
-        }
-
-        // ค้นหารายการพัสดุยืดหยุ่น (ละเว้นขีด -)
-        function onItemSelect(val) {
-            const cleanVal = val.replace(/-/g, '').toLowerCase().trim();
-            const found = masterDb.find(d => {
-                const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
-                const fullText = `[${d.code}] ${d.name}`.toLowerCase();
-                const cleanFullText = fullText.replace(/-/g, '');
-                return cleanCode === cleanVal || d.name.toLowerCase().includes(val.toLowerCase()) || cleanFullText.includes(cleanVal);
-            });
-
-            if (found) {
-                selectedUnitWeight = found.unitWeight;
-                calculateRowWeight();
-            } else {
-                selectedUnitWeight = 0;
-            }
-        }
-
-        function calculateRowWeight() {
-            if (selectedUnitWeight > 0) {
-                const qty = parseFloat(document.getElementById('calcItemQty').value) || 0;
-                document.getElementById('calcItemWeight').value = (qty * selectedUnitWeight).toFixed(2);
-            }
-        }
-
-        async function scanDocumentWithAI() {
-            const fileInput = document.getElementById('scanDocInput');
-            if(!fileInput.files || !fileInput.files[0]) return alert('กรุณาเลือกหรือถ่ายรูปภาพเอกสารก่อนครับ');
-
-            const statusEl = document.getElementById('scanStatus');
-            const scanBtn = document.getElementById('scanBtn');
-            
-            statusEl.innerText = "⏳ AI กำลังอ่านและวิเคราะห์เอกสาร...";
-            statusEl.classList.remove('hidden');
-            scanBtn.disabled = true;
-
-            try {
-                const base64Image = await fileToBase64(fileInput.files[0]);
-                const base64Data = base64Image.split(',')[1];
-                const prompt = `วิเคราะห์ภาพเอกสารการรื้อถอนรายการพัสดุนี้ หาว่ามีรายการพัสดุใดบ้างที่ระบุการรื้อถอน โดยตอบกลับในรูปแบบ JSON Array เท่านั้น ในรูปแบบ: [{"code": "รหัสพัสดุ", "name": "ชื่อรายการพัสดุ", "qty": 1}] ให้ส่งคืนเฉพาะ JSON Array สุทธิเท่านั้น`;
-
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${aiApiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [ { text: prompt }, { inline_data: { mime_type: fileInput.files[0].type, data: base64Data } } ]}],
-                        generationConfig: { response_mime_type: "application/json" }
-                    })
-                });
-
-                if (!response.ok) throw new Error(`API Error`);
-                const data = await response.json();
-                const textResult = data.candidates[0].content.parts[0].text.trim();
-                const cleanJsonText = textResult.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-                const scannedItems = JSON.parse(cleanJsonText);
-
-                const folder = folders.find(f => f.id === currentFolderId);
-                const newItemsToAdd = [];
-                let addedCount = 0;
-
-                scannedItems.forEach(scanned => {
-                    const matchInDb = masterDb.find(d => (scanned.code && d.code.replace(/-/g,'').toLowerCase() === scanned.code.replace(/-/g,'').toLowerCase()) || (scanned.name && d.name.includes(scanned.name)));
-                    const unitWeight = matchInDb ? matchInDb.unitWeight : 0;
-                    const qty = parseFloat(scanned.qty) || 1;
-                    const nameDisplay = scanned.code ? `[${scanned.code}] ${scanned.name || ''}` : scanned.name;
-                    newItemsToAdd.push({ name: nameDisplay, qty: qty, weight: parseFloat((qty * unitWeight).toFixed(2)) });
-                    addedCount++;
-                });
-
-                const existingItems = folder.items || [];
-                await db.collection('folders').doc(currentFolderId).update({ items: [...existingItems, ...newItemsToAdd] });
-                statusEl.innerText = `✅ เพิ่มรายการจากสแกนสำเร็จ ${addedCount} รายการ`;
-
-            } catch (err) {
-                console.error("Scan Error:", err);
-                statusEl.innerText = "❌ ไม่สามารถอ่านรูปภาพได้ ชัดเจนไม่พอหรือรูปแบบไม่ตรง";
-            } finally {
-                scanBtn.disabled = false;
-                fileInput.value = '';
-            }
-        }
-
-        async function saveToMasterDb() {
-            const code = document.getElementById('dbCode').value.trim();
-            const name = document.getElementById('dbName').value.trim();
-            const unitWeight = parseFloat(document.getElementById('dbUnitWeight').value) || 0;
-            const fileInput = document.getElementById('dbImageInput');
-            const editId = document.getElementById('editDbId').value;
-            const existingImageUrl = document.getElementById('editImageUrl').value;
-            const saveBtn = document.getElementById('saveDbBtn');
-
-            if(!code || !name || unitWeight <= 0) return alert('กรุณากรอกข้อมูลพัสดุให้ครบถ้วน');
-
-            saveBtn.disabled = true;
-            saveBtn.innerText = 'กำลังประมวลผลและบันทึก...';
-
-            try {
-                let finalImageUrl = existingImageUrl;
-
-                if(fileInput.files && fileInput.files[0]) {
-                    finalImageUrl = await fileToBase64(fileInput.files[0]);
-                }
-
-                const newItem = { code, name, unitWeight, image: finalImageUrl };
-
-                if (editId) {
-                    await db.collection('masterDb').doc(editId).update(newItem);
-                } else {
-                    await db.collection('masterDb').add(newItem);
-                }
-                
-                resetDbForm();
-            } catch(e) { 
-                console.error(e); 
-                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล'); 
-            } finally { 
-                saveBtn.disabled = false; 
-                saveBtn.innerText = 'บันทึกเข้าคลังข้อมูล'; 
-            }
-        }
-
-        function renderMasterDb() {
-            const tbody = document.getElementById('dbTableList');
-            const searchVal = (document.getElementById('dbSearchInput')?.value || '').replace(/-/g, '').toLowerCase().trim();
-            
-            tbody.innerHTML = '';
-
-            let filteredDb = masterDb;
-            if (searchVal) {
-                filteredDb = masterDb.filter(d => {
-                    const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
-                    const cleanName = (d.name || '').toLowerCase();
-                    return cleanCode.includes(searchVal) || cleanName.includes(searchVal.toLowerCase());
-                });
-            }
-
-            if(filteredDb.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ไม่พบรายการพัสดุที่ค้นหา</td></tr>`;
-                return;
-            }
-
-            filteredDb.forEach((d) => {
-                const imgTag = d.image 
-                    ? `<img src="${d.image}" class="w-10 h-10 object-cover rounded-xl cursor-pointer border-2 border-slate-900" onclick="openModal('${d.id}')">`
-                    : `<span class="text-xs text-slate-400">ไม่มีรูป</span>`;
-
+        if(!folder.items || folder.items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</td></tr>`;
+        } else {
+            folder.items.forEach((item, index) => {
+                totalWeight += item.weight;
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50">
-                        <td class="p-3 text-center">${imgTag}</td>
-                        <td class="p-3 font-bold text-slate-900">${d.code}</td>
-                        <td class="p-3 text-slate-800">${d.name}</td>
-                        <td class="p-3 text-right font-bold text-slate-900">${d.unitWeight.toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
-                        <td class="p-3 text-center">
-                            <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs mr-2 cursor-pointer">แก้ไข</button>
-                            <button onclick="deleteDbItem('${d.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer">ลบ</button>
+                        <td class="p-3 text-slate-900">${item.name}</td>
+                        <td class="p-3 text-center text-slate-700">${item.qty}</td>
+                        <td class="p-3 text-right font-bold text-slate-900">${item.weight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="p-3 text-center no-print">
+                            <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer">ลบ</button>
                         </td>
                     </tr>
                 `;
             });
         }
 
-        function editDbItem(id) {
-            const item = masterDb.find(d => d.id === id);
-            document.getElementById('dbCode').value = item.code;
-            document.getElementById('dbName').value = item.name;
-            document.getElementById('dbUnitWeight').value = item.unitWeight;
-            document.getElementById('editDbId').value = item.id;
-            document.getElementById('editImageUrl').value = item.image || '';
+        document.getElementById('folderTotalWeight').innerText = totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
 
-            document.getElementById('dbFormTitle').innerText = `✏️ แก้ไขข้อมูลพัสดุ: ${item.code}`;
-            document.getElementById('saveDbBtn').innerText = 'บันทึกการแก้ไข';
-            document.getElementById('saveDbBtn').className = "flex-1 bg-amber-400 text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-500 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
-            document.getElementById('cancelEditBtn').classList.remove('hidden');
+    async function addItemToFolder() {
+        const folder = folders.find(f => f.id === currentFolderId);
+        const nameInput = document.getElementById('calcItemName');
+        const qtyInput = document.getElementById('calcItemQty');
+        const weightInput = document.getElementById('calcItemWeight');
+        
+        const name = nameInput.value.trim();
+        const qty = parseFloat(qtyInput.value) || 1;
+        const weight = parseFloat(weightInput.value) || 0;
+        const btn = document.getElementById('addItemBtn');
 
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        if(!name || weight <= 0) return alert('กรุณากรอกรายการและน้ำหนักให้ถูกต้อง');
+
+        btn.disabled = true;
+        btn.innerText = 'กำลังเพิ่ม...';
+        try {
+            const existingItems = folder.items || [];
+            const newItems = [...existingItems, { name, qty, weight }];
+            await db.collection('folders').doc(currentFolderId).update({ items: newItems });
+            
+            nameInput.value = '';
+            qtyInput.value = '1';
+            weightInput.value = '';
+            selectedUnitWeight = 0;
+            nameInput.focus();
+        } catch(e) { console.error(e); alert('อัปเดตข้อมูลล้มเหลว'); }
+        finally { btn.disabled = false; btn.innerText = 'เพิ่มเข้าแฟ้ม'; }
+    }
+
+    function handleNameKeydown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('calcItemQty').focus();
+            document.getElementById('calcItemQty').select();
         }
+    }
 
-        async function deleteDbItem(id) {
-            if(confirm('ต้องการลบพัสดุนี้ออกจากคลัง?')) {
-                await db.collection('masterDb').doc(id).delete();
+    function handleQtyKeydown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addItemToFolder();
+        }
+    }
+
+    async function removeItemFromFolder(index) {
+        const folder = folders.find(f => f.id === currentFolderId);
+        const newItems = folder.items.filter((_, i) => i !== index);
+        await db.collection('folders').doc(currentFolderId).update({ items: newItems });
+    }
+
+    function onItemSelect(val) {
+        const cleanVal = val.replace(/-/g, '').toLowerCase().trim();
+        const found = masterDb.find(d => {
+            const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
+            const fullText = `[${d.code}] ${d.name}`.toLowerCase();
+            const cleanFullText = fullText.replace(/-/g, '');
+            return cleanCode === cleanVal || d.name.toLowerCase().includes(val.toLowerCase()) || cleanFullText.includes(cleanVal);
+        });
+
+        if (found) {
+            selectedUnitWeight = found.unitWeight;
+            calculateRowWeight();
+        } else {
+            selectedUnitWeight = 0;
+        }
+    }
+
+    function calculateRowWeight() {
+        if (selectedUnitWeight > 0) {
+            const qty = parseFloat(document.getElementById('calcItemQty').value) || 0;
+            document.getElementById('calcItemWeight').value = (qty * selectedUnitWeight).toFixed(2);
+        }
+    }
+
+    async function scanDocumentWithAI() {
+        const fileInput = document.getElementById('scanDocInput');
+        if(!fileInput.files || !fileInput.files[0]) return alert('กรุณาเลือกหรือถ่ายรูปภาพเอกสารก่อนครับ');
+
+        const statusEl = document.getElementById('scanStatus');
+        const scanBtn = document.getElementById('scanBtn');
+        
+        statusEl.innerText = "⏳ AI กำลังอ่านและวิเคราะห์เอกสาร...";
+        statusEl.classList.remove('hidden');
+        scanBtn.disabled = true;
+
+        try {
+            const base64Image = await fileToBase64(fileInput.files[0]);
+            const base64Data = base64Image.split(',')[1];
+            const prompt = `วิเคราะห์ภาพเอกสารการรื้อถอนรายการพัสดุนี้ หาว่ามีรายการพัสดุใดบ้างที่ระบุการรื้อถอน โดยตอบกลับในรูปแบบ JSON Array เท่านั้น ในรูปแบบ: [{"code": "รหัสพัสดุ", "name": "ชื่อรายการพัสดุ", "qty": 1}] ให้ส่งคืนเฉพาะ JSON Array สุทธิเท่านั้น`;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${aiApiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [ { text: prompt }, { inline_data: { mime_type: fileInput.files[0].type, data: base64Data } } ]}],
+                    generationConfig: { response_mime_type: "application/json" }
+                })
+            });
+
+            if (!response.ok) throw new Error(`API Error`);
+            const data = await response.json();
+            const textResult = data.candidates[0].content.parts[0].text.trim();
+            const cleanJsonText = textResult.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+            const scannedItems = JSON.parse(cleanJsonText);
+
+            const folder = folders.find(f => f.id === currentFolderId);
+            const newItemsToAdd = [];
+            let addedCount = 0;
+
+            scannedItems.forEach(scanned => {
+                const matchInDb = masterDb.find(d => (scanned.code && d.code.replace(/-/g,'').toLowerCase() === scanned.code.replace(/-/g,'').toLowerCase()) || (scanned.name && d.name.includes(scanned.name)));
+                const unitWeight = matchInDb ? matchInDb.unitWeight : 0;
+                const qty = parseFloat(scanned.qty) || 1;
+                const nameDisplay = scanned.code ? `[${scanned.code}] ${scanned.name || ''}` : scanned.name;
+                newItemsToAdd.push({ name: nameDisplay, qty: qty, weight: parseFloat((qty * unitWeight).toFixed(2)) });
+                addedCount++;
+            });
+
+            const existingItems = folder.items || [];
+            await db.collection('folders').doc(currentFolderId).update({ items: [...existingItems, ...newItemsToAdd] });
+            statusEl.innerText = `✅ เพิ่มรายการจากสแกนสำเร็จ ${addedCount} รายการ`;
+
+        } catch (err) {
+            console.error("Scan Error:", err);
+            statusEl.innerText = "❌ ไม่สามารถอ่านรูปภาพได้ ชัดเจนไม่พอหรือรูปแบบไม่ตรง";
+        } finally {
+            scanBtn.disabled = false;
+            fileInput.value = '';
+        }
+    }
+
+    async function saveToMasterDb() {
+        const code = document.getElementById('dbCode').value.trim();
+        const name = document.getElementById('dbName').value.trim();
+        const unitWeight = parseFloat(document.getElementById('dbUnitWeight').value) || 0;
+        const fileInput = document.getElementById('dbImageInput');
+        const editId = document.getElementById('editDbId').value;
+        const existingImageUrl = document.getElementById('editImageUrl').value;
+        const saveBtn = document.getElementById('saveDbBtn');
+
+        if(!code || !name || unitWeight <= 0) return alert('กรุณากรอกข้อมูลพัสดุให้ครบถ้วน');
+
+        saveBtn.disabled = true;
+        saveBtn.innerText = 'กำลังประมวลผลและบันทึก...';
+
+        try {
+            let finalImageUrl = existingImageUrl;
+
+            if(fileInput.files && fileInput.files[0]) {
+                finalImageUrl = await fileToBase64(fileInput.files[0]);
             }
+
+            const newItem = { code, name, unitWeight, image: finalImageUrl };
+
+            if (editId) {
+                await db.collection('masterDb').doc(editId).update(newItem);
+            } else {
+                await db.collection('masterDb').add(newItem);
+            }
+            
+            resetDbForm();
+            await fetchMasterDb(); // ⚡ โหลดคลังข้อมูลใหม่เมื่อบันทึก
+        } catch(e) { 
+            console.error(e); 
+            alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล'); 
+        } finally { 
+            saveBtn.disabled = false; 
+            saveBtn.innerText = 'บันทึกเข้าคลังข้อมูล'; 
         }
+    }
 
-        function resetDbForm() {
-            document.getElementById('dbCode').value = '';
-            document.getElementById('dbName').value = '';
-            document.getElementById('dbUnitWeight').value = '';
-            document.getElementById('dbImageInput').value = '';
-            document.getElementById('editDbId').value = '';
-            document.getElementById('editImageUrl').value = '';
+    function renderMasterDb() {
+        const tbody = document.getElementById('dbTableList');
+        const searchVal = (document.getElementById('dbSearchInput')?.value || '').replace(/-/g, '').toLowerCase().trim();
+        
+        tbody.innerHTML = '';
 
-            document.getElementById('dbFormTitle').innerText = '➕ บันทึกพัสดุใหม่เข้าคลัง';
-            document.getElementById('saveDbBtn').innerText = 'บันทึกเข้าคลังข้อมูล';
-            document.getElementById('saveDbBtn').className = "flex-1 brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
-            document.getElementById('cancelEditBtn').classList.add('hidden');
-        }
-
-        function updateDatalist() {
-            const list = document.getElementById('masterDatalist');
-            list.innerHTML = '';
-            masterDb.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = `[${d.code}] ${d.name}`;
-                list.appendChild(opt);
+        let filteredDb = masterDb;
+        if (searchVal) {
+            filteredDb = masterDb.filter(d => {
+                const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
+                const cleanName = (d.name || '').toLowerCase();
+                return cleanCode.includes(searchVal) || cleanName.includes(searchVal.toLowerCase());
             });
         }
 
-        function openModal(id) {
-            const item = masterDb.find(d => d.id === id);
-            document.getElementById('modalTitle').innerText = `[${item.code}] ${item.name}`;
-            document.getElementById('modalDetail').innerText = `น้ำหนักต่อหน่วย: ${item.unitWeight} กก.`;
-            document.getElementById('modalImage').src = item.image || 'https://via.placeholder.com/300?text=No+Image';
-            document.getElementById('imageModal').classList.remove('hidden');
+        if(filteredDb.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ไม่พบรายการพัสดุที่ค้นหา</td></tr>`;
+            return;
         }
 
-        function closeModal() { document.getElementById('imageModal').classList.add('hidden'); }
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
+        // ⚡ Limit แสดงผลแค่ 100 รายการแรกขณะค้นหาเพื่อไม่ให้ Dom ค้าง
+        const displayList = filteredDb.slice(0, 100);
+
+        displayList.forEach((d) => {
+            const imgTag = d.image 
+                ? `<img src="${d.image}" class="w-10 h-10 object-cover rounded-xl cursor-pointer border-2 border-slate-900" onclick="openModal('${d.id}')">`
+                : `<span class="text-xs text-slate-400">ไม่มีรูป</span>`;
+
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-3 text-center">${imgTag}</td>
+                    <td class="p-3 font-bold text-slate-900">${d.code}</td>
+                    <td class="p-3 text-slate-800">${d.name}</td>
+                    <td class="p-3 text-right font-bold text-slate-900">${d.unitWeight.toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs mr-2 cursor-pointer">แก้ไข</button>
+                        <button onclick="deleteDbItem('${d.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer">ลบ</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function editDbItem(id) {
+        const item = masterDb.find(d => d.id === id);
+        document.getElementById('dbCode').value = item.code;
+        document.getElementById('dbName').value = item.name;
+        document.getElementById('dbUnitWeight').value = item.unitWeight;
+        document.getElementById('editDbId').value = item.id;
+        document.getElementById('editImageUrl').value = item.image || '';
+
+        document.getElementById('dbFormTitle').innerText = `✏️ แก้ไขข้อมูลพัสดุ: ${item.code}`;
+        document.getElementById('saveDbBtn').innerText = 'บันทึกการแก้ไข';
+        document.getElementById('saveDbBtn').className = "flex-1 bg-amber-400 text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-500 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
+        document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function deleteDbItem(id) {
+        if(confirm('ต้องการลบพัสดุนี้ออกจากคลัง?')) {
+            await db.collection('masterDb').doc(id).delete();
+            await fetchMasterDb();
         }
-    </script>
+    }
+
+    function resetDbForm() {
+        document.getElementById('dbCode').value = '';
+        document.getElementById('dbName').value = '';
+        document.getElementById('dbUnitWeight').value = '';
+        document.getElementById('dbImageInput').value = '';
+        document.getElementById('editDbId').value = '';
+        document.getElementById('editImageUrl').value = '';
+
+        document.getElementById('dbFormTitle').innerText = '➕ บันทึกพัสดุใหม่เข้าคลัง';
+        document.getElementById('saveDbBtn').innerText = 'บันทึกเข้าคลังข้อมูล';
+        document.getElementById('saveDbBtn').className = "flex-1 brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
+        document.getElementById('cancelEditBtn').classList.add('hidden');
+    }
+
+    function updateDatalist() {
+        const list = document.getElementById('masterDatalist');
+        list.innerHTML = '';
+        masterDb.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = `[${d.code}] ${d.name}`;
+            list.appendChild(opt);
+        });
+    }
+
+    function openModal(id) {
+        const item = masterDb.find(d => d.id === id);
+        document.getElementById('modalTitle').innerText = `[${item.code}] ${item.name}`;
+        document.getElementById('modalDetail').innerText = `น้ำหนักต่อหน่วย: ${item.unitWeight} กก.`;
+        document.getElementById('modalImage').src = item.image || 'https://via.placeholder.com/300?text=No+Image';
+        document.getElementById('imageModal').classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('imageModal').classList.add('hidden'); }
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+</script>
 </body>
 </html>
