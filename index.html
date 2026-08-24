@@ -215,17 +215,19 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // ⚡ แก้แจ้งเตือนสีเหลืองใน Console ด้วยการเพิ่ม merge: true
-   db.settings({
-    experimentalAutoDetectLongPolling: true,
-    useFetchStreams: false
-});
+    // ⚡ แก้ไขลบ merge: true ออกเรียบร้อยแล้ว
+    db.settings({
+        experimentalAutoDetectLongPolling: true,
+        useFetchStreams: false
+    });
 
     let folders = [];
     let masterDb = [];
     let currentFolderId = null;
     let selectedUnitWeight = 0;
-    const aiApiKey = 'AIzaSyBUKqWfWWBpI5hvTKbvMCkRRgG_yA7E3ow';
+    
+    // ⚡ อัปเดต API Key ใหม่ตามที่แสดงในระบบ Google Cloud
+    const aiApiKey = 'AIzaSyBUKqWfWWBpl5hvTKbvMCkRRgG_yA7E3ow';
 
     db.collection('folders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
         folders = [];
@@ -300,7 +302,6 @@
         }
     }
 
-    // ⚡ อัปเดตประสิทธิภาพการวาดหน้าจอแฟ้มงาน
     function renderFolders() {
         const container = document.getElementById('foldersList');
         if(folders.length === 0) {
@@ -331,7 +332,6 @@
         container.innerHTML = htmlContent;
     }
 
-    // ⚡ อัปเดตประสิทธิภาพการวาดหน้าจอคำนวณ
     function renderCalcView() {
         const folder = folders.find(f => f.id === currentFolderId);
         if(!folder) return navTo('folders');
@@ -369,14 +369,13 @@
         const qtyInput = document.getElementById('calcItemQty');
         const weightInput = document.getElementById('calcItemWeight');
         
-        let name = nameInput.value.trim(); // ⚡ เปลี่ยนจาก const เป็น let เพื่อให้แก้ไขข้อความได้
+        let name = nameInput.value.trim();
         const qty = parseFloat(qtyInput.value) || 1;
         const weight = parseFloat(weightInput.value) || 0;
         const btn = document.getElementById('addItemBtn');
 
         if(!name || weight <= 0) return alert('กรุณากรอกรายการและน้ำหนักให้ถูกต้อง');
 
-        // ⚡ เพิ่มเงื่อนไข: ตรวจสอบถ้าระบุแค่รหัส ให้ดึงชื่อเต็มมาประกอบร่าง
         const cleanInput = name.replace(/-/g, '').toLowerCase().trim();
         const found = masterDb.find(d => {
             const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
@@ -424,35 +423,28 @@
         await db.collection('folders').doc(currentFolderId).update({ items: newItems });
     }
 
-  function onItemSelect(val) {
-        // ลบขีดและเว้นวรรคออกเพื่อเทียบตัวอักษร
+    function onItemSelect(val) {
         const cleanVal = val.replace(/-/g, '').toLowerCase().trim();
         if (!cleanVal) {
             selectedUnitWeight = 0;
             return;
         }
 
-        // ⚡ แก้ไขใหม่: ใช้ === แทน .includes() เพื่อให้ต้องพิมพ์ตรงเป๊ะๆ หรือเลือกจาก Dropdown เท่านั้น
         const found = masterDb.find(d => {
             const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
             const fullText = `[${d.code}] ${d.name}`.toLowerCase();
-            
-            // ตรวจสอบว่าตรงกับรหัส (แบบตัดขีด) หรือ ตรงกับชื่อเต็มที่เลือกมาจาก Dropdown
             return cleanCode === cleanVal || fullText === val.toLowerCase();
         });
 
         if (found) {
             selectedUnitWeight = found.unitWeight;
-            
-            // ⚡ เปลี่ยนข้อความในช่องกรอกเป็นชื่อเต็ม เมื่อข้อมูลตรงแบบเป๊ะๆ แล้วเท่านั้น
             document.getElementById('calcItemName').value = `[${found.code}] ${found.name}`; 
-            
             calculateRowWeight();
         } else {
-            // ถ้าระหว่างพิมพ์ยังไม่เจอแบบเป๊ะๆ ให้เซ็ตน้ำหนักเป็น 0 รอไว้ก่อน
             selectedUnitWeight = 0;
         }
     }
+
     function calculateRowWeight() {
         if (selectedUnitWeight > 0) {
             const qty = parseFloat(document.getElementById('calcItemQty').value) || 0;
@@ -460,7 +452,7 @@
         }
     }
 
-async function scanDocumentWithAI() {
+    async function scanDocumentWithAI() {
         const fileInput = document.getElementById('scanDocInput');
         if(!fileInput.files || !fileInput.files[0]) return alert('กรุณาเลือกหรือถ่ายรูปภาพเอกสารก่อนครับ');
 
@@ -479,12 +471,11 @@ async function scanDocumentWithAI() {
             const base64Image = await fileToBase64(fileInput.files[0]);
             const base64Data = base64Image.split(',')[1];
             
-            // ⚡ อัปเดตชื่อโมเดลเป็น gemini-3.6-flash ตามที่ API แจ้งแนะนำ
-// ✅ แก้ไขแล้ว: เปลี่ยนชื่อโมเดล และปรับ Casing ของ JSON Body
-const modelName = "gemini-3.6-flash";
-const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
+            // ⚡ กำหนดชื่อโมเดลเป็น gemini-2.5-flash
+            const modelName = "gemini-2.5-flash";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
 
-const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
+            const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
 1. 'code': คอลัมน์รหัสพัสดุ (เช่น 1-00-001-0004 NA)
 2. 'name': คอลัมน์รายการพัสดุ (เช่น POLE 12 M.)
 3. 'qty': คอลัมน์ "จำนวนพัสดุตามประมาณการ" (เอาเฉพาะที่เป็นตัวเลข)
@@ -492,33 +483,34 @@ const prompt = `วิเคราะห์ภาพเอกสารใบส�
 ตอบกลับเฉพาะรูปแบบ JSON เท่านั้น ห้ามมีข้อความอื่น:
 {"items": [{"code": "1-00-001-0004 NA", "name": "POLE 12 M.", "qty": 22}]}`;
 
-const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        contents: [{ 
-            parts: [ 
-                { text: prompt }, 
-                { inlineData: { mimeType: fileInput.files[0].type, data: base64Data } } 
-            ]
-        }],
-        generationConfig: { responseMimeType: "application/json" }
-    })
-});
+            // ⚡ ปรับ camelCase ให้ถูกต้องสำหรับ REST API
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ 
+                        parts: [ 
+                            { text: prompt }, 
+                            { inlineData: { mimeType: fileInput.files[0].type, data: base64Data } } 
+                        ]
+                    }],
+                    generationConfig: { responseMimeType: "application/json" }
+                })
+            });
 
-if (!response.ok) {
-    const errText = await response.text();
-    console.error("API Detail Error:", errText);
-    throw new Error(`API Error ${response.status}`);
-}
-
-const data = await response.json();
-let textResult = data.candidates[0].content.parts[0].text;
-
-// ลบ Markdown Tag ออกเพื่อกัน Error ตอนสั่ง JSON.parse
-textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
-
-const parsedData = JSON.parse(textResult);
+            if (!response.ok) {
+                const errText = await response.text();
+                console.error("API Detail Error:", errText);
+                throw new Error(`API Error ${response.status}`);
+            }
+            
+            const data = await response.json();
+            let textResult = data.candidates[0].content.parts[0].text;
+            
+            // ลบ Markdown ออกป้องกันข้อผิดพลาดการ Parse JSON
+            textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
+            
+            const parsedData = JSON.parse(textResult);
             const scannedItems = parsedData.items || [];
 
             if(scannedItems.length === 0) {
@@ -557,6 +549,7 @@ const parsedData = JSON.parse(textResult);
             fileInput.value = '';
         }
     }
+
     async function saveToMasterDb() {
         const code = document.getElementById('dbCode').value.trim();
         const name = document.getElementById('dbName').value.trim();
@@ -596,7 +589,6 @@ const parsedData = JSON.parse(textResult);
         }
     }
 
-    // ⚡ อัปเดตประสิทธิภาพการวาดตารางค้นหา (แก้ปัญหาค้างตอนพิมพ์และกด)
     function renderMasterDb() {
         const tbody = document.getElementById('dbTableList');
         const searchVal = (document.getElementById('dbSearchInput')?.value || '').replace(/-/g, '').toLowerCase().trim();
@@ -616,7 +608,7 @@ const parsedData = JSON.parse(textResult);
         }
 
         const displayList = filteredDb.slice(0, 100);
-        let htmlContent = ''; // ⚡ สร้าง String เตรียมไว้ ก่อนยัดลงหน้าจอ
+        let htmlContent = '';
 
         displayList.forEach((d) => {
             const imgTag = d.image 
@@ -637,7 +629,7 @@ const parsedData = JSON.parse(textResult);
             `;
         });
 
-        tbody.innerHTML = htmlContent; // ⚡ ยัดลงหน้าจอทีเดียวจบ ไม่กระตุกแล้ว
+        tbody.innerHTML = htmlContent;
     }
 
     function editDbItem(id) {
