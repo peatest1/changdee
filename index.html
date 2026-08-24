@@ -481,7 +481,7 @@ async function scanDocumentWithAI() {
             
             // ⚡ อัปเดตชื่อโมเดลเป็น gemini-3.6-flash ตามที่ API แจ้งแนะนำ
 // ✅ แก้ไขแล้ว: เปลี่ยนชื่อโมเดล และปรับ Casing ของ JSON Body
-const modelName = "gemini-2.5-flash"; 
+const modelName = "gemini-1.5-flash"; 
 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
 
 const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
