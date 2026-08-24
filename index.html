@@ -108,11 +108,11 @@
                     <h3 class="text-sm font-bold text-slate-900 mb-3">➕ เพิ่มรายการด้วยมือ</h3>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
                         <div class="md:col-span-6">
-                            <input type="text" id="calcItemName" list="masterDatalist" placeholder="ค้นหารหัส/ชื่อพัสดุ..." oninput="onItemSelect(this.value)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium focus:outline-none">
+                            <input type="text" id="calcItemName" list="masterDatalist" placeholder="ค้นหารหัส/ชื่อพัสดุ..." oninput="onItemSelect(this.value)" onkeydown="handleNameKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium focus:outline-none">
                             <datalist id="masterDatalist"></datalist>
                         </div>
                         <div class="md:col-span-3">
-                            <input type="number" id="calcItemQty" placeholder="จำนวน" value="1" oninput="calculateRowWeight()" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
+                            <input type="number" id="calcItemQty" placeholder="จำนวน" value="1" oninput="calculateRowWeight()" onkeydown="handleQtyKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
                         </div>
                         <div class="md:col-span-3">
                             <input type="number" id="calcItemWeight" placeholder="น้ำหนักรวม (กก.)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
@@ -162,6 +162,13 @@
                     <div class="flex gap-2">
                         <button onclick="saveToMasterDb()" id="saveDbBtn" class="flex-1 brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">บันทึกเข้าคลังข้อมูล</button>
                         <button onclick="resetDbForm()" id="cancelEditBtn" class="hidden bg-slate-200 text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-slate-300 transition">ยกเลิก</button>
+                    </div>
+                </div>
+
+                <!-- ช่องค้นหาพัสดุในคลัง -->
+                <div class="mb-4">
+                    <div class="relative">
+                        <input type="text" id="dbSearchInput" oninput="renderMasterDb()" placeholder="🔍 ค้นหารหัสพัสดุ หรือ ชื่อพัสดุ (ไม่ต้องพิมพ์ขีด - ก็ได้)..." class="w-full px-4 py-2.5 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">
                     </div>
                 </div>
 
@@ -343,9 +350,13 @@
 
         async function addItemToFolder() {
             const folder = folders.find(f => f.id === currentFolderId);
-            const name = document.getElementById('calcItemName').value.trim();
-            const qty = parseFloat(document.getElementById('calcItemQty').value) || 1;
-            const weight = parseFloat(document.getElementById('calcItemWeight').value) || 0;
+            const nameInput = document.getElementById('calcItemName');
+            const qtyInput = document.getElementById('calcItemQty');
+            const weightInput = document.getElementById('calcItemWeight');
+            
+            const name = nameInput.value.trim();
+            const qty = parseFloat(qtyInput.value) || 1;
+            const weight = parseFloat(weightInput.value) || 0;
             const btn = document.getElementById('addItemBtn');
 
             if(!name || weight <= 0) return alert('กรุณากรอกรายการและน้ำหนักให้ถูกต้อง');
@@ -357,12 +368,28 @@
                 const newItems = [...existingItems, { name, qty, weight }];
                 await db.collection('folders').doc(currentFolderId).update({ items: newItems });
                 
-                document.getElementById('calcItemName').value = '';
-                document.getElementById('calcItemQty').value = '1';
-                document.getElementById('calcItemWeight').value = '';
+                nameInput.value = '';
+                qtyInput.value = '1';
+                weightInput.value = '';
                 selectedUnitWeight = 0;
+                nameInput.focus();
             } catch(e) { console.error(e); alert('อัปเดตข้อมูลล้มเหลว'); }
             finally { btn.disabled = false; btn.innerText = 'เพิ่มเข้าแฟ้ม'; }
+        }
+
+        function handleNameKeydown(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('calcItemQty').focus();
+                document.getElementById('calcItemQty').select();
+            }
+        }
+
+        function handleQtyKeydown(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addItemToFolder();
+            }
         }
 
         async function removeItemFromFolder(index) {
@@ -371,8 +398,16 @@
             await db.collection('folders').doc(currentFolderId).update({ items: newItems });
         }
 
+        // ค้นหารายการพัสดุยืดหยุ่น (ละเว้นขีด -)
         function onItemSelect(val) {
-            const found = masterDb.find(d => `[${d.code}] ${d.name}` === val || d.code === val || d.name === val);
+            const cleanVal = val.replace(/-/g, '').toLowerCase().trim();
+            const found = masterDb.find(d => {
+                const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
+                const fullText = `[${d.code}] ${d.name}`.toLowerCase();
+                const cleanFullText = fullText.replace(/-/g, '');
+                return cleanCode === cleanVal || d.name.toLowerCase().includes(val.toLowerCase()) || cleanFullText.includes(cleanVal);
+            });
+
             if (found) {
                 selectedUnitWeight = found.unitWeight;
                 calculateRowWeight();
@@ -424,7 +459,7 @@
                 let addedCount = 0;
 
                 scannedItems.forEach(scanned => {
-                    const matchInDb = masterDb.find(d => (scanned.code && d.code.toLowerCase() === scanned.code.toLowerCase()) || (scanned.name && d.name.includes(scanned.name)));
+                    const matchInDb = masterDb.find(d => (scanned.code && d.code.replace(/-/g,'').toLowerCase() === scanned.code.replace(/-/g,'').toLowerCase()) || (scanned.name && d.name.includes(scanned.name)));
                     const unitWeight = matchInDb ? matchInDb.unitWeight : 0;
                     const qty = parseFloat(scanned.qty) || 1;
                     const nameDisplay = scanned.code ? `[${scanned.code}] ${scanned.name || ''}` : scanned.name;
@@ -486,14 +521,25 @@
 
         function renderMasterDb() {
             const tbody = document.getElementById('dbTableList');
+            const searchVal = (document.getElementById('dbSearchInput')?.value || '').replace(/-/g, '').toLowerCase().trim();
+            
             tbody.innerHTML = '';
 
-            if(masterDb.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีพัสดุในคลัง หรือกำลังโหลด...</td></tr>`;
+            let filteredDb = masterDb;
+            if (searchVal) {
+                filteredDb = masterDb.filter(d => {
+                    const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
+                    const cleanName = (d.name || '').toLowerCase();
+                    return cleanCode.includes(searchVal) || cleanName.includes(searchVal.toLowerCase());
+                });
+            }
+
+            if(filteredDb.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ไม่พบรายการพัสดุที่ค้นหา</td></tr>`;
                 return;
             }
 
-            masterDb.forEach((d) => {
+            filteredDb.forEach((d) => {
                 const imgTag = d.image 
                     ? `<img src="${d.image}" class="w-10 h-10 object-cover rounded-xl cursor-pointer border-2 border-slate-900" onclick="openModal('${d.id}')">`
                     : `<span class="text-xs text-slate-400">ไม่มีรูป</span>`;
