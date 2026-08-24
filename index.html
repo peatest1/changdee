@@ -476,15 +476,14 @@ async function scanDocumentWithAI() {
             const base64Image = await fileToBase64(fileInput.files[0]);
             const base64Data = base64Image.split(',')[1];
             
-            // ⚡ เปลี่ยนแปลง Prompt ตรงนี้ ให้ AI เข้าใจโครงสร้างตาราง กฟภ. แบบเป๊ะๆ
-            const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค (PEA) ให้ดึงข้อมูลรายการพัสดุในตารางออกมาเป็น JSON Array เท่านั้น โดยให้อ้างอิงตำแหน่งข้อมูลดังนี้:
-1. 'code' (รหัสพัสดุ): ดึงจากคอลัมน์แรกสุด (คอลัมน์รหัสพัสดุ)
-2. 'name' (ชื่อรายการพัสดุ): ดึงจากคอลัมน์ที่สอง (คอลัมน์รายการ)
-3. 'qty' (จำนวนรื้อถอน): ดึงจากคอลัมน์ 'จำนวนพัสดุตามประมาณการ' (ให้ดึงเฉพาะที่เป็นตัวเลขพิมพ์ลงมา)
+            // ⚡ ปรับ Prompt ใหม่ ให้ส่งกลับมาเป็น Object ที่มี "items" คลุมอยู่ (ป้องกัน Error ตอน Parse JSON)
+            const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
+1. 'code': คอลัมน์รหัสพัสดุ (เช่น 1-00-001-0004 NA)
+2. 'name': คอลัมน์รายการพัสดุ
+3. 'qty': คอลัมน์ "จำนวนพัสดุตามประมาณการ" (เอาเฉพาะที่เป็นตัวเลข)
 
-ตอบกลับในรูปแบบ JSON Array แบบนี้เท่านั้น: 
-[{"code": "1-00-001-0004 NA", "name": "POLE 12 M.", "qty": 22}, {"code": "1-00-011-0002 NA", "name": "CROSSARM...", "qty": 24}]
-คำเตือน: ห้ามส่งข้อความอธิบายใดๆ กลับมา และห้ามมีเครื่องหมาย \`\`\` ครอบข้อความ ให้ส่งมาแค่ JSON สุทธิเท่านั้น`;
+ให้ตอบกลับเป็นรูปแบบ JSON เท่านั้น ห้ามมีคำอธิบาย รูปแบบดังนี้:
+{"items": [{"code": "1-00-001-0004 NA", "name": "POLE 12 M.", "qty": 22}]}`;
 
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${aiApiKey}`, {
                 method: 'POST',
@@ -495,21 +494,38 @@ async function scanDocumentWithAI() {
                 })
             });
 
-            if (!response.ok) throw new Error(`API Error`);
+            // ⚡ เพิ่มการตรวจสอบ Error จาก API โดยตรง
+            if (!response.ok) {
+                const errData = await response.text();
+                throw new Error(`API Error: ${response.status}`);
+            }
+            
             const data = await response.json();
-            const textResult = data.candidates[0].content.parts[0].text.trim();
-            const cleanJsonText = textResult.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-            const scannedItems = JSON.parse(cleanJsonText);
+            const textResult = data.candidates[0].content.parts[0].text;
+            
+            // พิมพ์ผลลัพธ์จาก AI ลง Console (กด F12 ดูได้หากเกิดปัญหา)
+            console.log("AI Response:", textResult);
+            
+            const parsedData = JSON.parse(textResult);
+            const scannedItems = parsedData.items || []; // ดึงข้อมูลจาก items
+
+            if(scannedItems.length === 0) {
+                 throw new Error("AI สแกนสำเร็จแต่ไม่พบข้อมูลในตาราง");
+            }
 
             const folder = folders.find(f => f.id === currentFolderId);
             const newItemsToAdd = [];
             let addedCount = 0;
 
             scannedItems.forEach(scanned => {
+                // ข้ามแถวที่ว่างเปล่าจริงๆ
+                if(!scanned.code && !scanned.name) return; 
+                
                 const matchInDb = masterDb.find(d => (scanned.code && d.code.replace(/-/g,'').toLowerCase() === scanned.code.replace(/-/g,'').toLowerCase()) || (scanned.name && d.name.includes(scanned.name)));
                 const unitWeight = matchInDb ? matchInDb.unitWeight : 0;
                 const qty = parseFloat(scanned.qty) || 1;
                 const nameDisplay = scanned.code ? `[${scanned.code}] ${scanned.name || ''}` : scanned.name;
+                
                 newItemsToAdd.push({ name: nameDisplay, qty: qty, weight: parseFloat((qty * unitWeight).toFixed(2)) });
                 addedCount++;
             });
@@ -520,13 +536,13 @@ async function scanDocumentWithAI() {
 
         } catch (err) {
             console.error("Scan Error:", err);
-            statusEl.innerText = "❌ ไม่สามารถอ่านรูปภาพได้ ชัดเจนไม่พอหรือรูปแบบไม่ตรง";
+            // ⚡ โชว์ข้อความ Error บนหน้าจอให้รู้ว่าพังที่จุดไหน
+            statusEl.innerText = `❌ ข้อผิดพลาด: ${err.message}`;
         } finally {
             scanBtn.disabled = false;
             fileInput.value = '';
         }
     }
-
     async function saveToMasterDb() {
         const code = document.getElementById('dbCode').value.trim();
         const name = document.getElementById('dbName').value.trim();
