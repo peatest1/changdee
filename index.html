@@ -31,33 +31,36 @@
         .brand-yellow { background-color: #F5B837; }
         .brand-yellow-light { background-color: #FEF3D6; }
         @media print { .no-print { display: none !important; } }
+/* ตั้งค่าตารางให้กว้าง 100% พอดีกรอบ */
+table {
+    width: 100%;
+    table-layout: fixed; /* บังคับให้ตารางคำนวณขนาดตามที่เรากำหนด */
+}
 
-        /* --- เพิ่มส่วนนี้: ทำให้ตารางเลื่อนซ้ายขวาได้ --- */
-        .table-responsive {
-            width: 100%;
-            overflow-x: auto; /* ทำให้เกิดแถบเลื่อนแนวนอนถ้ายาวเกินจอ */
-            -webkit-overflow-scrolling: touch; /* ปัดเลื่อนบนมือถือได้ลื่นไหล */
-        }
+/* บังคับให้ข้อความในตารางตัดขึ้นบรรทัดใหม่ ไม่ดันตารางให้ทะลุจอ */
+td, th {
+    word-wrap: break-word;
+    white-space: normal; 
+    overflow-wrap: break-word;
+}
 
-        table {
-            width: 100%;
-            min-width: 550px; /* บังคับความกว้างขั้นต่ำ ถ้าจอมือถือเล็กกว่านี้จะเกิดแถบเลื่อน */
-        }
-
-        td, th {
-            word-wrap: break-word;
-            white-space: normal; 
-            overflow-wrap: break-word;
-        }
-
-        @media screen and (max-width: 768px) {
-            table {
-                font-size: 13px; /* ปรับลดฟอนต์ให้พอดีกับมือถือ */
-            }
-            td, th {
-                padding: 8px 6px; /* ปรับระยะขอบเซลล์ */
-            }
-        }
+/* ปรับแต่งเฉพาะเมื่อเปิดบนหน้าจอมือถือ (ความกว้างไม่เกิน 768px) */
+@media screen and (max-width: 768px) {
+    table {
+        font-size: 12px; /* ลดขนาดตัวอักษรลงนิดหน่อยให้จุข้อมูลได้มากขึ้น */
+    }
+    
+    td, th {
+        padding: 6px 4px; /* ลดช่องว่างภายในเซลล์ (ซ้าย-ขวา) ให้แคบลง */
+    }
+    
+    /* คุณสามารถกำหนด % ความกว้างของแต่ละคอลัมน์คร่าวๆ ได้ (รวมกันให้ได้ 100%) */
+    /* สมมติว่าคอลัมน์ที่ 1=รูปภาพ, 2=รหัส, 3=ชื่อ, 4=น้ำหนัก */
+    th:nth-child(1), td:nth-child(1) { width: 15%; }
+    th:nth-child(2), td:nth-child(2) { width: 25%; }
+    th:nth-child(3), td:nth-child(3) { width: 40%; } /* ให้พื้นที่ชื่อวัสดุเยอะสุด */
+    th:nth-child(4), td:nth-child(4) { width: 20%; } /* คอลัมน์น้ำหนัก */
+}
     </style>
 </head>
 <body class="min-h-screen p-3 md:p-6">
@@ -148,8 +151,7 @@
                     <button onclick="addItemToFolder()" id="addItemBtn" class="mt-3 w-full bg-slate-900 text-white font-bold text-sm py-2.5 px-4 rounded-xl cursor-pointer hover:bg-slate-800 transition">เพิ่มเข้าแฟ้ม</button>
                 </div>
 
-                <!-- นำคลาส table-responsive มาครอบตารางหน้าคำนวณ -->
-                <div class="table-responsive mb-6 rounded-2xl border-2 border-slate-900">
+                <div class="overflow-x-auto mb-6 rounded-2xl border-2 border-slate-900">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="brand-yellow text-slate-900 text-xs font-bold uppercase tracking-wider border-b-2 border-slate-900">
@@ -200,8 +202,7 @@
                     </div>
                 </div>
 
-                <!-- นำคลาส table-responsive มาครอบตารางหน้าคลังข้อมูล -->
-                <div class="table-responsive rounded-2xl border-2 border-slate-900">
+                <div class="overflow-x-auto rounded-2xl border-2 border-slate-900">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="brand-yellow text-slate-900 text-xs font-bold uppercase tracking-wider border-b-2 border-slate-900">
@@ -500,7 +501,7 @@
             const base64Image = await fileToBase64(fileInput.files[0]);
             const base64Data = base64Image.split(',')[1];
             
-            // ⚡ กำหนดชื่อโมเดลเป็น gemini-3.6-flash
+            // ⚡ กำหนดชื่อโมเดลเป็น gemini-2.5-flash
             const modelName = "gemini-3.6-flash";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
 
