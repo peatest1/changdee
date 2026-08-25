@@ -31,6 +31,36 @@
         .brand-yellow { background-color: #F5B837; }
         .brand-yellow-light { background-color: #FEF3D6; }
         @media print { .no-print { display: none !important; } }
+/* ตั้งค่าตารางให้กว้าง 100% พอดีกรอบ */
+table {
+    width: 100%;
+    table-layout: fixed; /* บังคับให้ตารางคำนวณขนาดตามที่เรากำหนด */
+}
+
+/* บังคับให้ข้อความในตารางตัดขึ้นบรรทัดใหม่ ไม่ดันตารางให้ทะลุจอ */
+td, th {
+    word-wrap: break-word;
+    white-space: normal; 
+    overflow-wrap: break-word;
+}
+
+/* ปรับแต่งเฉพาะเมื่อเปิดบนหน้าจอมือถือ (ความกว้างไม่เกิน 768px) */
+@media screen and (max-width: 768px) {
+    table {
+        font-size: 12px; /* ลดขนาดตัวอักษรลงนิดหน่อยให้จุข้อมูลได้มากขึ้น */
+    }
+    
+    td, th {
+        padding: 6px 4px; /* ลดช่องว่างภายในเซลล์ (ซ้าย-ขวา) ให้แคบลง */
+    }
+    
+    /* คุณสามารถกำหนด % ความกว้างของแต่ละคอลัมน์คร่าวๆ ได้ (รวมกันให้ได้ 100%) */
+    /* สมมติว่าคอลัมน์ที่ 1=รูปภาพ, 2=รหัส, 3=ชื่อ, 4=น้ำหนัก */
+    th:nth-child(1), td:nth-child(1) { width: 15%; }
+    th:nth-child(2), td:nth-child(2) { width: 25%; }
+    th:nth-child(3), td:nth-child(3) { width: 40%; } /* ให้พื้นที่ชื่อวัสดุเยอะสุด */
+    th:nth-child(4), td:nth-child(4) { width: 20%; } /* คอลัมน์น้ำหนัก */
+}
     </style>
 </head>
 <body class="min-h-screen p-3 md:p-6">
