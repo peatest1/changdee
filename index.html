@@ -223,10 +223,7 @@
 
     <script>
         let folders = JSON.parse(localStorage.getItem('scrap_folders')) || [];
-        let masterDb = JSON.parse(localStorage.getItem('scrap_master_db')) || [
-            { code: 'ST-01', name: 'เหล็กเส้น 9มม.', unitWeight: 0.499, image: '' },
-            { code: 'ST-02', name: 'เหล็กกล่อง 2x2', unitWeight: 2.15, image: '' }
-        ];
+        let masterDb = JSON.parse(localStorage.getItem('scrap_master_db')) || [];
         
         const apiKey = 'AIzaSyD7CZEJ3TPusWj3QWi-h48iDnvvmEnVDlg';
         let currentFolderId = null;
