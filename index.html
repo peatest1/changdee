@@ -222,9 +222,14 @@
     </div>
 
     <script>
-        let folders = JSON.parse(localStorage.getItem('scrap_folders')) || [];
-        let masterDb = JSON.parse(localStorage.getItem('scrap_master_db')) || [];
-        
+        // --- ดึงข้อมูลจากคีย์เดิมมาใช้งานเพื่อป้องกันข้อมูลหาย ---
+        let savedFolders = localStorage.getItem('scrap_folders') || localStorage.getItem('folders');
+        let folders = savedFolders ? JSON.parse(savedFolders) : [];
+
+        let savedMasterDb = localStorage.getItem('scrap_master_db') || localStorage.getItem('masterDb') || localStorage.getItem('materials');
+        let masterDb = savedMasterDb ? JSON.parse(savedMasterDb) : [];
+        // ---------------------------------------------------
+
         const apiKey = 'AIzaSyD7CZEJ3TPusWj3QWi-h48iDnvvmEnVDlg';
         let currentFolderId = null;
         let selectedUnitWeight = 0;
@@ -312,7 +317,6 @@
             const statusEl = document.getElementById('scanStatus');
             const scanBtn = document.getElementById('scanBtn');
             
-            // เพิ่ม Shimmer & Pulse Animation เมื่อกดสแกน
             scanBtn.classList.add('animate-shimmer');
             statusEl.innerText = "⏳ AI กำลังอ่านและวิเคราะห์เอกสาร...";
             statusEl.className = "text-xs text-slate-900 font-bold mt-2 animate-pulse";
@@ -413,9 +417,8 @@
             const totalEl = document.getElementById('folderTotalWeight');
             totalEl.innerText = totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
             
-            // กระตุ้น Animation การเด้งของตัวเลขน้ำหนัก
             totalEl.classList.remove('animate-weight-pop');
-            void totalEl.offsetWidth; // trigger reflow
+            void totalEl.offsetWidth; 
             totalEl.classList.add('animate-weight-pop');
         }
 
@@ -584,8 +587,16 @@
         }
 
         function closeModal() { document.getElementById('imageModal').classList.add('hidden'); }
-        function saveFolders() { localStorage.setItem('scrap_folders', JSON.stringify(folders)); }
-        function saveMasterDb() { localStorage.setItem('scrap_master_db', JSON.stringify(masterDb)); }
+        
+        // --- อัปเดตฟังก์ชันบันทึกให้เก็บคีย์เดิมไว้ด้วย ---
+        function saveFolders() { 
+            localStorage.setItem('scrap_folders', JSON.stringify(folders)); 
+            localStorage.setItem('folders', JSON.stringify(folders)); 
+        }
+        function saveMasterDb() { 
+            localStorage.setItem('scrap_master_db', JSON.stringify(masterDb)); 
+            localStorage.setItem('masterDb', JSON.stringify(masterDb)); 
+        }
 
         renderFolders();
     </script>
