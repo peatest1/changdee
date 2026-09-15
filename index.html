@@ -31,16 +31,94 @@
         .brand-yellow { background-color: #F5B837; }
         .brand-yellow-light { background-color: #FEF3D6; }
         @media print { .no-print { display: none !important; } }
+
+        /* ===== Motion tokens ===== */
+        @keyframes shellIn {
+            from { opacity: 0; transform: translateY(14px) scale(.985); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes pageIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes cardPop {
+            from { opacity: 0; transform: translateY(10px) scale(.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes rowFade {
+            from { opacity: 0; transform: translateX(-6px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes modalPanelIn {
+            from { opacity: 0; transform: translateY(10px) scale(.94); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes backdropIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes gearSpin {
+            0%, 85%, 100% { transform: rotate(0deg); }
+            92.5% { transform: rotate(-14deg); }
+        }
+        @keyframes ringPulse {
+            0% { box-shadow: 0 0 0 0 rgba(245,184,55,.55); }
+            100% { box-shadow: 0 0 0 10px rgba(245,184,55,0); }
+        }
+
+        .app-shell { animation: shellIn .5s cubic-bezier(.16,1,.3,1) both; }
+        .page-anim { animation: pageIn .32s cubic-bezier(.16,1,.3,1) both; }
+        .card-pop { animation: cardPop .38s cubic-bezier(.16,1,.3,1) both; }
+        .row-fade { animation: rowFade .3s ease both; }
+
+        .btn-pop { transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease; }
+        .btn-pop:hover { transform: translate(-1px, -1px); }
+        .btn-pop:active { transform: translate(1px, 1px) !important; }
+
+        .folder-card { transition: transform .2s ease, box-shadow .2s ease; }
+        .folder-card:hover { transform: translateY(-3px); box-shadow: 6px 6px 0px 0px rgba(30,41,59,1); }
+
+        .logo-badge { transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
+        .logo-badge:hover { transform: rotate(-6deg) scale(1.08); }
+        .logo-badge svg { transition: transform .6s ease; }
+        .logo-badge:hover svg { animation: gearSpin 1.1s ease-in-out; }
+
+        .modal-backdrop.modal-in { animation: backdropIn .2s ease both; }
+        .modal-backdrop.modal-in .modal-panel { animation: modalPanelIn .28s cubic-bezier(.16,1,.3,1) both; }
+        .modal-backdrop.modal-out { animation: backdropIn .15s ease reverse both; }
+        .modal-backdrop.modal-out .modal-panel { animation: modalPanelIn .15s ease reverse both; }
+
+        .spinner {
+            width: 34px; height: 34px;
+            border: 4px solid #FEF3D6;
+            border-top-color: #F5B837;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+
+        .weight-live { transition: transform .25s ease; }
+        .weight-pulse { animation: ringPulse .6s ease; }
+
+        input, textarea { transition: box-shadow .2s ease, border-color .2s ease; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .app-shell, .page-anim, .card-pop, .row-fade, .btn-pop, .folder-card,
+            .logo-badge, .logo-badge svg, .modal-backdrop, .spinner, .weight-pulse {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen p-3 md:p-6">
 
-    <div class="max-w-5xl mx-auto bg-white rounded-3xl shadow-xl border-4 border-slate-900 overflow-hidden">
+    <div class="app-shell max-w-5xl mx-auto bg-white rounded-3xl shadow-xl border-4 border-slate-900 overflow-hidden">
         
         <!-- Header & Navbar -->
         <header class="brand-yellow px-6 py-4 border-b-4 border-slate-900 flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
             <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-white rounded-2xl border-2 border-slate-900 flex items-center justify-center p-1.5 shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">
+                <div class="logo-badge w-12 h-12 bg-white rounded-2xl border-2 border-slate-900 flex items-center justify-center p-1.5 shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">
                     <svg viewBox="0 0 100 100" class="w-full h-full fill-current text-slate-900">
                         <path d="M 20 20 Q 50 10 80 20 Q 80 35 50 35 Q 20 35 20 20 Z" fill="#F5B837" stroke="#1E293B" stroke-width="4"/>
                         <rect x="42" y="32" width="16" height="10" fill="#F5B837" stroke="#1E293B" stroke-width="4"/>
@@ -57,24 +135,27 @@
             </div>
 
             <div class="flex gap-2 w-full sm:w-auto">
-                <button onclick="navTo('folders')" id="navFoldersBtn" class="flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5">📂 แฟ้มงาน</button>
-                <button onclick="navTo('db')" id="navDbBtn" class="flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5">📦 คลังพัสดุ</button>
+                <button onclick="navTo('folders')" id="navFoldersBtn" class="btn-pop flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5">📂 แฟ้มงาน</button>
+                <button onclick="navTo('db')" id="navDbBtn" class="btn-pop flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5">📦 คลังพัสดุ</button>
             </div>
         </header>
 
         <div class="p-6">
             <!-- PAGE 1: แฟ้มงาน -->
-            <div id="pageFolders">
+            <div id="pageFolders" class="page-anim">
                 <div class="mb-6 brand-yellow-light p-4 rounded-2xl border-2 border-slate-900">
                     <h2 class="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1">➕ สร้างแฟ้มงานใหม่</h2>
                     <div class="flex gap-2">
                         <input type="text" id="newFolderName" placeholder="กรอกชื่อแฟ้มงาน หรือ เลขที่โครงการ..." class="flex-1 px-4 py-2.5 bg-white border-2 border-slate-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-sm">
-                        <button onclick="createFolder()" id="createFolderBtn" class="brand-yellow text-slate-900 border-2 border-slate-900 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-400 cursor-pointer transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)] active:translate-x-0.5 active:translate-y-0.5">สร้างแฟ้ม</button>
+                        <button onclick="createFolder()" id="createFolderBtn" class="btn-pop brand-yellow text-slate-900 border-2 border-slate-900 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-400 cursor-pointer transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)] active:translate-x-0.5 active:translate-y-0.5">สร้างแฟ้ม</button>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="foldersList">
-                    <div class="col-span-full text-center text-slate-400 font-bold py-12">⏳ กำลังโหลดข้อมูลจาก Cloud...</div>
+                    <div class="col-span-full flex flex-col items-center justify-center gap-3 text-slate-400 font-bold py-12 page-anim">
+                        <div class="spinner"></div>
+                        กำลังโหลดข้อมูลจาก Cloud...
+                    </div>
                 </div>
             </div>
 
@@ -82,10 +163,10 @@
             <div id="pageCalc" class="hidden">
                 <div class="flex justify-between items-center mb-6 pb-3 border-b-2 border-slate-200">
                     <div>
-                        <button onclick="navTo('folders')" class="text-xs font-bold text-slate-600 hover:text-slate-900 mb-1 inline-block no-print">← กลับไปเลือกแฟ้มงาน</button>
+                        <button onclick="navTo('folders')" class="text-xs font-bold text-slate-600 hover:text-slate-900 mb-1 inline-block no-print transition hover:-translate-x-0.5">← กลับไปเลือกแฟ้มงาน</button>
                         <h2 class="text-xl font-bold text-slate-900" id="calcFolderName">แฟ้มงาน: -</h2>
                     </div>
-                    <button onclick="window.print()" class="no-print px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-800 transition">🖨️ พิมพ์ / บันทึก PDF</button>
+                    <button onclick="window.print()" class="btn-pop no-print px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-800 transition">🖨️ พิมพ์ / บันทึก PDF</button>
                 </div>
 
                 <div class="mb-6 brand-yellow-light p-4 rounded-2xl border-2 border-slate-900 no-print">
@@ -98,10 +179,10 @@
                             <input type="file" id="scanDocInput" accept="image/*" capture="environment" class="w-full text-xs text-slate-700 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-2 file:border-slate-900 file:text-xs file:font-bold file:bg-white file:text-slate-900 hover:file:bg-slate-100 cursor-pointer border-2 border-slate-900 rounded-xl bg-white p-1">
                         </div>
                         <div class="md:col-span-4">
-                            <button onclick="scanDocumentWithAI()" id="scanBtn" class="w-full brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">🔍 เริ่มสแกนรูปภาพ</button>
+                            <button onclick="scanDocumentWithAI()" id="scanBtn" class="btn-pop w-full brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">🔍 เริ่มสแกนรูปภาพ</button>
                         </div>
                     </div>
-                    <p id="scanStatus" class="text-xs text-slate-900 font-bold mt-2 hidden"></p>
+                    <p id="scanStatus" class="text-xs text-slate-900 font-bold mt-2 hidden page-anim"></p>
                 </div>
 
                 <div class="mb-6 bg-slate-50 p-4 rounded-2xl border-2 border-slate-900 no-print">
@@ -118,7 +199,7 @@
                             <input type="number" id="calcItemWeight" placeholder="น้ำหนักรวม (กก.)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
                         </div>
                     </div>
-                    <button onclick="addItemToFolder()" id="addItemBtn" class="mt-3 w-full bg-slate-900 text-white font-bold text-sm py-2.5 px-4 rounded-xl cursor-pointer hover:bg-slate-800 transition">เพิ่มเข้าแฟ้ม</button>
+                    <button onclick="addItemToFolder()" id="addItemBtn" class="btn-pop mt-3 w-full bg-slate-900 text-white font-bold text-sm py-2.5 px-4 rounded-xl cursor-pointer hover:bg-slate-800 transition">เพิ่มเข้าแฟ้ม</button>
                 </div>
 
                 <div class="overflow-x-auto mb-6 rounded-2xl border-2 border-slate-900">
@@ -135,7 +216,7 @@
                     </table>
                 </div>
 
-                <div class="brand-yellow text-slate-900 p-5 rounded-2xl border-2 border-slate-900 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(30,41,59,1)]">
+                <div id="totalWeightBox" class="weight-live brand-yellow text-slate-900 p-5 rounded-2xl border-2 border-slate-900 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(30,41,59,1)]">
                     <span class="text-base font-bold">น้ำหนักรวมเศษเหล็กทั้งสิ้น:</span>
                     <div class="text-right">
                         <span id="folderTotalWeight" class="text-3xl font-black">0.00</span>
@@ -160,8 +241,8 @@
                         <input type="file" id="dbImageInput" accept="image/*" class="w-full text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-2 file:border-slate-900 file:text-xs file:font-bold file:bg-white file:text-slate-900 hover:file:bg-slate-100 cursor-pointer border-2 border-slate-900 rounded-xl bg-white p-1">
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="saveToMasterDb()" id="saveDbBtn" class="flex-1 brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">บันทึกเข้าคลังข้อมูล</button>
-                        <button onclick="resetDbForm()" id="cancelEditBtn" class="hidden bg-slate-200 text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-slate-300 transition">ยกเลิก</button>
+                        <button onclick="saveToMasterDb()" id="saveDbBtn" class="btn-pop flex-1 brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">บันทึกเข้าคลังข้อมูล</button>
+                        <button onclick="resetDbForm()" id="cancelEditBtn" class="btn-pop hidden bg-slate-200 text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-slate-300 transition">ยกเลิก</button>
                     </div>
                 </div>
 
@@ -191,9 +272,9 @@
     </div>
 
     <!-- Modal ขยายรูป -->
-    <div id="imageModal" class="fixed inset-0 bg-slate-900/80 flex justify-center items-center hidden z-50 p-4 backdrop-blur-sm">
-        <div class="bg-white border-4 border-slate-900 p-4 rounded-3xl max-w-lg w-full relative shadow-2xl">
-            <button onclick="closeModal()" class="absolute top-3 right-3 bg-slate-900 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg cursor-pointer">&times;</button>
+    <div id="imageModal" class="modal-backdrop fixed inset-0 bg-slate-900/80 flex justify-center items-center hidden z-50 p-4 backdrop-blur-sm">
+        <div class="modal-panel bg-white border-4 border-slate-900 p-4 rounded-3xl max-w-lg w-full relative shadow-2xl">
+            <button onclick="closeModal()" class="btn-pop absolute top-3 right-3 bg-slate-900 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg cursor-pointer hover:rotate-90 transition-transform duration-200">&times;</button>
             <h3 id="modalTitle" class="font-bold text-lg text-slate-900 mb-2">รายละเอียดพัสดุ</h3>
             <div class="flex justify-center bg-slate-100 rounded-2xl p-2 max-h-96 overflow-hidden mb-3 border-2 border-slate-900">
                 <img id="modalImage" src="" class="object-contain max-h-80">
@@ -250,24 +331,36 @@
 
     fetchMasterDb();
 
+    function playPageAnim(el) {
+        el.classList.remove('page-anim');
+        void el.offsetWidth; // restart animation
+        el.classList.add('page-anim');
+    }
+
     function navTo(page) {
         document.getElementById('pageFolders').classList.add('hidden');
         document.getElementById('pageCalc').classList.add('hidden');
         document.getElementById('pageDb').classList.add('hidden');
 
-        document.getElementById('navFoldersBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5";
-        document.getElementById('navDbBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5";
+        document.getElementById('navFoldersBtn').className = "btn-pop flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5";
+        document.getElementById('navDbBtn').className = "btn-pop flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition active:translate-y-0.5";
 
         if(page === 'folders') {
-            document.getElementById('pageFolders').classList.remove('hidden');
-            document.getElementById('navFoldersBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
+            const el = document.getElementById('pageFolders');
+            el.classList.remove('hidden');
+            playPageAnim(el);
+            document.getElementById('navFoldersBtn').className = "btn-pop flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
             renderFolders();
         } else if(page === 'db') {
-            document.getElementById('pageDb').classList.remove('hidden');
-            document.getElementById('navDbBtn').className = "flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
+            const el = document.getElementById('pageDb');
+            el.classList.remove('hidden');
+            playPageAnim(el);
+            document.getElementById('navDbBtn').className = "btn-pop flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
             renderMasterDb();
         } else if(page === 'calc') {
-            document.getElementById('pageCalc').classList.remove('hidden');
+            const el = document.getElementById('pageCalc');
+            el.classList.remove('hidden');
+            playPageAnim(el);
             renderCalcView();
         }
     }
@@ -310,21 +403,21 @@
         }
 
         let htmlContent = '';
-        folders.forEach(f => {
+        folders.forEach((f, i) => {
             const totalWeight = f.items ? f.items.reduce((sum, item) => sum + item.weight, 0) : 0;
             const itemLength = f.items ? f.items.length : 0;
             htmlContent += `
-                <div class="border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition flex flex-col justify-between">
+                <div style="animation-delay:${Math.min(i, 12) * 45}ms" class="card-pop folder-card border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] transition flex flex-col justify-between">
                     <div>
                         <div class="flex justify-between items-start mb-2">
                             <h3 class="font-bold text-slate-900 text-base leading-tight">${f.name}</h3>
-                            <button onclick="deleteFolder('${f.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold whitespace-nowrap ml-2 cursor-pointer">ลบ</button>
+                            <button onclick="deleteFolder('${f.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold whitespace-nowrap ml-2 cursor-pointer transition hover:scale-110">ลบ</button>
                         </div>
                         <p class="text-xs font-semibold text-slate-500 mb-4">${itemLength} รายการ</p>
                     </div>
                     <div class="flex justify-between items-center pt-3 border-t-2 border-slate-100">
                         <span class="text-sm font-black text-slate-900">${totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2})} กก.</span>
-                        <button onclick="openFolder('${f.id}')" class="px-3 py-1.5 brand-yellow border-2 border-slate-900 text-slate-900 rounded-xl text-xs font-bold cursor-pointer hover:bg-amber-400 transition">เปิดคำนวณ →</button>
+                        <button onclick="openFolder('${f.id}')" class="btn-pop px-3 py-1.5 brand-yellow border-2 border-slate-900 text-slate-900 rounded-xl text-xs font-bold cursor-pointer hover:bg-amber-400 transition">เปิดคำนวณ →</button>
                     </div>
                 </div>
             `;
@@ -347,12 +440,12 @@
             folder.items.forEach((item, index) => {
                 totalWeight += item.weight;
                 htmlContent += `
-                    <tr class="hover:bg-slate-50">
+                    <tr style="animation-delay:${Math.min(index, 14) * 30}ms" class="row-fade hover:bg-slate-50 transition-colors">
                         <td class="p-3 text-slate-900">${item.name}</td>
                         <td class="p-3 text-center text-slate-700">${item.qty}</td>
                         <td class="p-3 text-right font-bold text-slate-900">${item.weight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         <td class="p-3 text-center no-print">
-                            <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer">ลบ</button>
+                            <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110">ลบ</button>
                         </td>
                     </tr>
                 `;
@@ -360,7 +453,33 @@
             tbody.innerHTML = htmlContent;
         }
 
-        document.getElementById('folderTotalWeight').innerText = totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        animateWeightTo(totalWeight);
+    }
+
+    function animateWeightTo(target) {
+        const el = document.getElementById('folderTotalWeight');
+        const box = document.getElementById('totalWeightBox');
+        const start = parseFloat((el.innerText || '0').replace(/,/g, '')) || 0;
+        if (Math.abs(start - target) < 0.005) {
+            el.innerText = target.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            return;
+        }
+        const duration = 420;
+        const t0 = performance.now();
+        function step(now) {
+            const p = Math.min(1, (now - t0) / duration);
+            const eased = 1 - Math.pow(1 - p, 3);
+            const val = start + (target - start) * eased;
+            el.innerText = val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (p < 1) {
+                requestAnimationFrame(step);
+            } else if (box) {
+                box.classList.remove('weight-pulse');
+                void box.offsetWidth;
+                box.classList.add('weight-pulse');
+            }
+        }
+        requestAnimationFrame(step);
     }
 
     async function addItemToFolder() {
@@ -461,6 +580,9 @@
         
         statusEl.innerText = "⏳ AI กำลังอ่านและวิเคราะห์ตารางเอกสาร...";
         statusEl.classList.remove('hidden');
+        statusEl.classList.remove('page-anim');
+        void statusEl.offsetWidth;
+        statusEl.classList.add('page-anim');
         scanBtn.disabled = true;
 
         try {
@@ -610,20 +732,20 @@
         const displayList = filteredDb.slice(0, 100);
         let htmlContent = '';
 
-        displayList.forEach((d) => {
+        displayList.forEach((d, i) => {
             const imgTag = d.image 
-                ? `<img src="${d.image}" class="w-10 h-10 object-cover rounded-xl cursor-pointer border-2 border-slate-900" onclick="openModal('${d.id}')">`
+                ? `<img src="${d.image}" class="w-10 h-10 object-cover rounded-xl cursor-pointer border-2 border-slate-900 transition hover:scale-110" onclick="openModal('${d.id}')">`
                 : `<span class="text-xs text-slate-400">ไม่มีรูป</span>`;
 
             htmlContent += `
-                <tr class="hover:bg-slate-50">
+                <tr style="animation-delay:${Math.min(i, 14) * 25}ms" class="row-fade hover:bg-slate-50 transition-colors">
                     <td class="p-3 text-center">${imgTag}</td>
                     <td class="p-3 font-bold text-slate-900">${d.code}</td>
                     <td class="p-3 text-slate-800">${d.name}</td>
                     <td class="p-3 text-right font-bold text-slate-900">${d.unitWeight.toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
                     <td class="p-3 text-center">
-                        <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs mr-2 cursor-pointer">แก้ไข</button>
-                        <button onclick="deleteDbItem('${d.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer">ลบ</button>
+                        <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs mr-2 cursor-pointer transition hover:scale-110 inline-block">แก้ไข</button>
+                        <button onclick="deleteDbItem('${d.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110 inline-block">ลบ</button>
                     </td>
                 </tr>
             `;
@@ -642,7 +764,7 @@
 
         document.getElementById('dbFormTitle').innerText = `✏️ แก้ไขข้อมูลพัสดุ: ${item.code}`;
         document.getElementById('saveDbBtn').innerText = 'บันทึกการแก้ไข';
-        document.getElementById('saveDbBtn').className = "flex-1 bg-amber-400 text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-500 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
+        document.getElementById('saveDbBtn').className = "btn-pop flex-1 bg-amber-400 text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-500 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
         document.getElementById('cancelEditBtn').classList.remove('hidden');
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -665,7 +787,7 @@
 
         document.getElementById('dbFormTitle').innerText = '➕ บันทึกพัสดุใหม่เข้าคลัง';
         document.getElementById('saveDbBtn').innerText = 'บันทึกเข้าคลังข้อมูล';
-        document.getElementById('saveDbBtn').className = "flex-1 brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
+        document.getElementById('saveDbBtn').className = "btn-pop flex-1 brand-yellow text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-400 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
         document.getElementById('cancelEditBtn').classList.add('hidden');
     }
 
@@ -684,10 +806,21 @@
         document.getElementById('modalTitle').innerText = `[${item.code}] ${item.name}`;
         document.getElementById('modalDetail').innerText = `น้ำหนักต่อหน่วย: ${item.unitWeight} กก.`;
         document.getElementById('modalImage').src = item.image || 'https://via.placeholder.com/300?text=No+Image';
-        document.getElementById('imageModal').classList.remove('hidden');
+        const modal = document.getElementById('imageModal');
+        modal.classList.remove('hidden', 'modal-out');
+        void modal.offsetWidth;
+        modal.classList.add('modal-in');
     }
 
-    function closeModal() { document.getElementById('imageModal').classList.add('hidden'); }
+    function closeModal() {
+        const modal = document.getElementById('imageModal');
+        modal.classList.remove('modal-in');
+        modal.classList.add('modal-out');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('modal-out');
+        }, 150);
+    }
     function fileToBase64(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
