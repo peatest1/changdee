@@ -295,6 +295,7 @@
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const storage = firebase.storage();
 
     // ⚡ แก้ไขลบ merge: true ออกเรียบร้อยแล้ว
     db.settings({
@@ -307,15 +308,26 @@
     let currentFolderId = null;
     let selectedUnitWeight = 0;
     
-    // ⚡ อัปเดต API Key ใหม่ตามที่แสดงในระบบ Google Cloud
+    // ⚡ โมเดลที่ใช้งานจริง (ตรวจสอบแล้วว่าเป็น Model ID ที่ถูกต้องสำหรับ Gemini API)
 	const aiApiKey = atob('QUl6YVN5QXViQXNuMHpOSFJzRHZaM3p1T21JSklCM09VMzJqS2Nr');
+
+    // Helpers กันข้อมูลเพี้ยน (ป้องกัน field หายหรือไม่ใช่ตัวเลข ทำให้แอปพังทั้งหน้า)
+    function safeStr(v) { return (v === null || v === undefined) ? '' : String(v); }
+    function safeNum(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
 
     db.collection('folders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
         folders = [];
         snapshot.forEach(doc => folders.push({ id: doc.id, ...doc.data() }));
         if (!document.getElementById('pageFolders').classList.contains('hidden')) renderFolders();
         if (currentFolderId && !document.getElementById('pageCalc').classList.contains('hidden')) renderCalcView();
-    }, error => console.error("Firestore Folders Error:", error));
+    }, error => {
+        console.error("Firestore Folders Error:", error);
+        const container = document.getElementById('foldersList');
+        // ป้องกันหน้าจอหมุนค้างตลอดไปเมื่อเชื่อมต่อ Cloud ไม่สำเร็จ (เช่น สิทธิ์ไม่พอ/ออฟไลน์)
+        if (container) {
+            container.innerHTML = `<div class="col-span-full text-center text-red-500 font-bold py-12">⚠️ ไม่สามารถโหลดข้อมูลแฟ้มงานได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือสิทธิ์การเข้าถึง Firestore<br><span class="text-xs text-slate-400 font-normal">${error.message || ''}</span></div>`;
+        }
+    });
 
     async function fetchMasterDb() {
         try {
@@ -326,6 +338,10 @@
             updateDatalist();
         } catch (e) {
             console.error("Fetch MasterDb Error:", e);
+            const tbody = document.getElementById('dbTableList');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-500 font-bold">⚠️ โหลดข้อมูลคลังพัสดุไม่สำเร็จ: ${e.message || e}</td></tr>`;
+            }
         }
     }
 
@@ -380,7 +396,7 @@
                 createdAt: firebase.firestore.FieldValue.serverTimestamp() 
             });
             nameInput.value = '';
-        } catch(e) { console.error(e); alert('เกิดข้อผิดพลาดในการสร้างแฟ้ม'); }
+        } catch(e) { console.error(e); alert('เกิดข้อผิดพลาดในการสร้างแฟ้ม: ' + (e.message || e)); }
         finally { btn.disabled = false; btn.innerText = 'สร้างแฟ้ม'; }
     }
 
@@ -391,7 +407,9 @@
 
     async function deleteFolder(id) {
         if(confirm('ต้องการลบแฟ้มงานนี้ใช่หรือไม่? ข้อมูลจะถูกลบถาวร')) {
-            await db.collection('folders').doc(id).delete();
+            try {
+                await db.collection('folders').doc(id).delete();
+            } catch(e) { console.error(e); alert('ลบแฟ้มงานไม่สำเร็จ: ' + (e.message || e)); }
         }
     }
 
@@ -404,13 +422,15 @@
 
         let htmlContent = '';
         folders.forEach((f, i) => {
-            const totalWeight = f.items ? f.items.reduce((sum, item) => sum + item.weight, 0) : 0;
+            // ป้องกันแอปพังถ้ามีรายการที่ weight ไม่ใช่ตัวเลข (ข้อมูลเพี้ยน) จนรวมยอดออกมาเป็น NaN
+            const totalWeight = f.items ? f.items.reduce((sum, item) => sum + safeNum(item.weight), 0) : 0;
             const itemLength = f.items ? f.items.length : 0;
+            const folderName = safeStr(f.name) || '(ไม่มีชื่อ)';
             htmlContent += `
                 <div style="animation-delay:${Math.min(i, 12) * 45}ms" class="card-pop folder-card border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] transition flex flex-col justify-between">
                     <div>
                         <div class="flex justify-between items-start mb-2">
-                            <h3 class="font-bold text-slate-900 text-base leading-tight">${f.name}</h3>
+                            <h3 class="font-bold text-slate-900 text-base leading-tight">${folderName}</h3>
                             <button onclick="deleteFolder('${f.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold whitespace-nowrap ml-2 cursor-pointer transition hover:scale-110">ลบ</button>
                         </div>
                         <p class="text-xs font-semibold text-slate-500 mb-4">${itemLength} รายการ</p>
@@ -429,7 +449,7 @@
         const folder = folders.find(f => f.id === currentFolderId);
         if(!folder) return navTo('folders');
 
-        document.getElementById('calcFolderName').innerText = `แฟ้มงาน: ${folder.name}`;
+        document.getElementById('calcFolderName').innerText = `แฟ้มงาน: ${safeStr(folder.name)}`;
         const tbody = document.getElementById('calcItemList');
         let totalWeight = 0;
 
@@ -438,12 +458,13 @@
         } else {
             let htmlContent = '';
             folder.items.forEach((item, index) => {
-                totalWeight += item.weight;
+                const itemWeight = safeNum(item.weight);
+                totalWeight += itemWeight;
                 htmlContent += `
                     <tr style="animation-delay:${Math.min(index, 14) * 30}ms" class="row-fade hover:bg-slate-50 transition-colors">
-                        <td class="p-3 text-slate-900">${item.name}</td>
-                        <td class="p-3 text-center text-slate-700">${item.qty}</td>
-                        <td class="p-3 text-right font-bold text-slate-900">${item.weight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="p-3 text-slate-900">${safeStr(item.name)}</td>
+                        <td class="p-3 text-center text-slate-700">${safeStr(item.qty)}</td>
+                        <td class="p-3 text-right font-bold text-slate-900">${itemWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         <td class="p-3 text-center no-print">
                             <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110">ลบ</button>
                         </td>
@@ -457,6 +478,7 @@
     }
 
     function animateWeightTo(target) {
+        target = safeNum(target);
         const el = document.getElementById('folderTotalWeight');
         const box = document.getElementById('totalWeightBox');
         const start = parseFloat((el.innerText || '0').replace(/,/g, '')) || 0;
@@ -484,6 +506,8 @@
 
     async function addItemToFolder() {
         const folder = folders.find(f => f.id === currentFolderId);
+        if (!folder) { alert('ไม่พบแฟ้มงานนี้ กรุณากลับไปเลือกแฟ้มงานใหม่'); return navTo('folders'); }
+
         const nameInput = document.getElementById('calcItemName');
         const qtyInput = document.getElementById('calcItemQty');
         const weightInput = document.getElementById('calcItemWeight');
@@ -497,12 +521,12 @@
 
         const cleanInput = name.replace(/-/g, '').toLowerCase().trim();
         const found = masterDb.find(d => {
-            const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
-            return cleanCode === cleanInput || name.includes(d.code);
+            const cleanCode = safeStr(d.code).replace(/-/g, '').toLowerCase();
+            return cleanCode === cleanInput || (d.code && name.includes(d.code));
         });
 
-        if (found && !name.includes(found.name)) {
-            name = `[${found.code}] ${found.name}`;
+        if (found && !name.includes(safeStr(found.name))) {
+            name = `[${safeStr(found.code)}] ${safeStr(found.name)}`;
         }
 
         btn.disabled = true;
@@ -517,7 +541,7 @@
             weightInput.value = '';
             selectedUnitWeight = 0;
             nameInput.focus();
-        } catch(e) { console.error(e); alert('อัปเดตข้อมูลล้มเหลว'); }
+        } catch(e) { console.error(e); alert('อัปเดตข้อมูลล้มเหลว: ' + (e.message || e)); }
         finally { btn.disabled = false; btn.innerText = 'เพิ่มเข้าแฟ้ม'; }
     }
 
@@ -538,8 +562,11 @@
 
     async function removeItemFromFolder(index) {
         const folder = folders.find(f => f.id === currentFolderId);
+        if (!folder || !folder.items) return;
         const newItems = folder.items.filter((_, i) => i !== index);
-        await db.collection('folders').doc(currentFolderId).update({ items: newItems });
+        try {
+            await db.collection('folders').doc(currentFolderId).update({ items: newItems });
+        } catch(e) { console.error(e); alert('ลบรายการไม่สำเร็จ: ' + (e.message || e)); }
     }
 
     function onItemSelect(val) {
@@ -550,14 +577,14 @@
         }
 
         const found = masterDb.find(d => {
-            const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
-            const fullText = `[${d.code}] ${d.name}`.toLowerCase();
+            const cleanCode = safeStr(d.code).replace(/-/g, '').toLowerCase();
+            const fullText = `[${safeStr(d.code)}] ${safeStr(d.name)}`.toLowerCase();
             return cleanCode === cleanVal || fullText === val.toLowerCase();
         });
 
         if (found) {
-            selectedUnitWeight = found.unitWeight;
-            document.getElementById('calcItemName').value = `[${found.code}] ${found.name}`; 
+            selectedUnitWeight = safeNum(found.unitWeight);
+            document.getElementById('calcItemName').value = `[${safeStr(found.code)}] ${safeStr(found.name)}`; 
             calculateRowWeight();
         } else {
             selectedUnitWeight = 0;
@@ -574,6 +601,9 @@
     async function scanDocumentWithAI() {
         const fileInput = document.getElementById('scanDocInput');
         if(!fileInput.files || !fileInput.files[0]) return alert('กรุณาเลือกหรือถ่ายรูปภาพเอกสารก่อนครับ');
+
+        const folder = folders.find(f => f.id === currentFolderId);
+        if (!folder) return alert('ไม่พบแฟ้มงานนี้ กรุณากลับไปเลือกแฟ้มงานใหม่');
 
         const statusEl = document.getElementById('scanStatus');
         const scanBtn = document.getElementById('scanBtn');
@@ -593,7 +623,6 @@
             const base64Image = await fileToBase64(fileInput.files[0]);
             const base64Data = base64Image.split(',')[1];
             
-            // ⚡ กำหนดชื่อโมเดลเป็น gemini-2.5-flash
             const modelName = "gemini-3.6-flash";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
 
@@ -605,7 +634,6 @@
 ตอบกลับเฉพาะรูปแบบ JSON เท่านั้น ห้ามมีข้อความอื่น:
 {"items": [{"code": "1-00-001-0004 NA", "name": "POLE 12 M.", "qty": 22}]}`;
 
-            // ⚡ ปรับ camelCase ให้ถูกต้องสำหรับ REST API
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -627,10 +655,18 @@
             }
             
             const data = await response.json();
-            let textResult = data.candidates[0].content.parts[0].text;
-            
+            const textRaw = data && data.candidates && data.candidates[0] && data.candidates[0].content
+                && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
+                ? data.candidates[0].content.parts[0].text
+                : null;
+
+            if (!textRaw) {
+                // ป้องกันแอปพังเมื่อ AI ไม่ส่งผลลัพธ์กลับมาตามรูปแบบที่คาด (เช่น ถูกบล็อกด้วยนโยบายความปลอดภัย)
+                throw new Error("AI ไม่ส่งผลลัพธ์กลับมา อาจเกิดจากภาพไม่ชัดเจนหรือถูกบล็อกโดยระบบ");
+            }
+
             // ลบ Markdown ออกป้องกันข้อผิดพลาดการ Parse JSON
-            textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
+            const textResult = textRaw.replace(/```json/g, '').replace(/```/g, '').trim();
             
             const parsedData = JSON.parse(textResult);
             const scannedItems = parsedData.items || [];
@@ -639,19 +675,19 @@
                  throw new Error("AI สแกนสำเร็จแต่ไม่พบรายการพัสดุในตาราง");
             }
 
-            const folder = folders.find(f => f.id === currentFolderId);
             const newItemsToAdd = [];
             let addedCount = 0;
 
             scannedItems.forEach(scanned => {
                 if(!scanned.code && !scanned.name) return; 
                 
+                // ป้องกันแอปพังถ้าพัสดุในคลังบางรายการไม่มี code/name (ข้อมูลเพี้ยน)
                 const matchInDb = masterDb.find(d => 
-                    (scanned.code && d.code.replace(/-/g,'').toLowerCase() === scanned.code.replace(/-/g,'').toLowerCase()) || 
-                    (scanned.name && d.name.toLowerCase().includes(scanned.name.toLowerCase()))
+                    (scanned.code && safeStr(d.code).replace(/-/g,'').toLowerCase() === String(scanned.code).replace(/-/g,'').toLowerCase()) || 
+                    (scanned.name && safeStr(d.name).toLowerCase().includes(String(scanned.name).toLowerCase()))
                 );
                 
-                const unitWeight = matchInDb ? matchInDb.unitWeight : 0;
+                const unitWeight = matchInDb ? safeNum(matchInDb.unitWeight) : 0;
                 const qty = parseFloat(scanned.qty) || 1;
                 const nameDisplay = scanned.code ? `[${scanned.code}] ${scanned.name || ''}` : scanned.name;
                 
@@ -672,6 +708,18 @@
         }
     }
 
+    // อัปโหลดรูปภาพขึ้น Firebase Storage แทนการฝัง base64 ลง Firestore โดยตรง
+    // (เอกสาร Firestore 1 ชิ้นมีขนาดจำกัดที่ 1MB — รูปถ่ายจากมือถือทั่วไปมักมีขนาดเกินนี้
+    // ทำให้การบันทึกพัสดุที่แนบรูปถ่ายจริงล้มเหลวหรือทำให้แอปทำงานช้าลงมากหากใช้ base64)
+    async function uploadDbImageIfAny(fileInput, existingUrl) {
+        if (!fileInput.files || !fileInput.files[0]) return existingUrl || '';
+        const file = fileInput.files[0];
+        const path = `masterDb/${Date.now()}_${file.name}`;
+        const ref = storage.ref().child(path);
+        await ref.put(file);
+        return await ref.getDownloadURL();
+    }
+
     async function saveToMasterDb() {
         const code = document.getElementById('dbCode').value.trim();
         const name = document.getElementById('dbName').value.trim();
@@ -687,10 +735,7 @@
         saveBtn.innerText = 'กำลังประมวลผลและบันทึก...';
 
         try {
-            let finalImageUrl = existingImageUrl;
-            if(fileInput.files && fileInput.files[0]) {
-                finalImageUrl = await fileToBase64(fileInput.files[0]);
-            }
+            const finalImageUrl = await uploadDbImageIfAny(fileInput, existingImageUrl);
 
             const newItem = { code, name, unitWeight, image: finalImageUrl };
 
@@ -704,7 +749,7 @@
             await fetchMasterDb(); 
         } catch(e) { 
             console.error(e); 
-            alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล'); 
+            alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + (e.message || e)); 
         } finally { 
             saveBtn.disabled = false; 
             saveBtn.innerText = 'บันทึกเข้าคลังข้อมูล'; 
@@ -718,9 +763,9 @@
         let filteredDb = masterDb;
         if (searchVal) {
             filteredDb = masterDb.filter(d => {
-                const cleanCode = (d.code || '').replace(/-/g, '').toLowerCase();
-                const cleanName = (d.name || '').toLowerCase();
-                return cleanCode.includes(searchVal) || cleanName.includes(searchVal.toLowerCase());
+                const cleanCode = safeStr(d.code).replace(/-/g, '').toLowerCase();
+                const cleanName = safeStr(d.name).toLowerCase();
+                return cleanCode.includes(searchVal) || cleanName.includes(searchVal);
             });
         }
 
@@ -737,12 +782,13 @@
                 ? `<img src="${d.image}" class="w-10 h-10 object-cover rounded-xl cursor-pointer border-2 border-slate-900 transition hover:scale-110" onclick="openModal('${d.id}')">`
                 : `<span class="text-xs text-slate-400">ไม่มีรูป</span>`;
 
+            // ป้องกันแอปพังทั้งหน้าถ้ามีรายการในคลังที่ไม่มี unitWeight เป็นตัวเลข (ข้อมูลเพี้ยน)
             htmlContent += `
                 <tr style="animation-delay:${Math.min(i, 14) * 25}ms" class="row-fade hover:bg-slate-50 transition-colors">
                     <td class="p-3 text-center">${imgTag}</td>
-                    <td class="p-3 font-bold text-slate-900">${d.code}</td>
-                    <td class="p-3 text-slate-800">${d.name}</td>
-                    <td class="p-3 text-right font-bold text-slate-900">${d.unitWeight.toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
+                    <td class="p-3 font-bold text-slate-900">${safeStr(d.code)}</td>
+                    <td class="p-3 text-slate-800">${safeStr(d.name)}</td>
+                    <td class="p-3 text-right font-bold text-slate-900">${safeNum(d.unitWeight).toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
                     <td class="p-3 text-center">
                         <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs mr-2 cursor-pointer transition hover:scale-110 inline-block">แก้ไข</button>
                         <button onclick="deleteDbItem('${d.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110 inline-block">ลบ</button>
@@ -756,13 +802,14 @@
 
     function editDbItem(id) {
         const item = masterDb.find(d => d.id === id);
-        document.getElementById('dbCode').value = item.code;
-        document.getElementById('dbName').value = item.name;
-        document.getElementById('dbUnitWeight').value = item.unitWeight;
+        if (!item) return;
+        document.getElementById('dbCode').value = safeStr(item.code);
+        document.getElementById('dbName').value = safeStr(item.name);
+        document.getElementById('dbUnitWeight').value = safeNum(item.unitWeight);
         document.getElementById('editDbId').value = item.id;
         document.getElementById('editImageUrl').value = item.image || '';
 
-        document.getElementById('dbFormTitle').innerText = `✏️ แก้ไขข้อมูลพัสดุ: ${item.code}`;
+        document.getElementById('dbFormTitle').innerText = `✏️ แก้ไขข้อมูลพัสดุ: ${safeStr(item.code)}`;
         document.getElementById('saveDbBtn').innerText = 'บันทึกการแก้ไข';
         document.getElementById('saveDbBtn').className = "btn-pop flex-1 bg-amber-400 text-slate-900 border-2 border-slate-900 font-bold text-sm py-2 px-4 rounded-xl cursor-pointer hover:bg-amber-500 transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]";
         document.getElementById('cancelEditBtn').classList.remove('hidden');
@@ -772,8 +819,10 @@
 
     async function deleteDbItem(id) {
         if(confirm('ต้องการลบพัสดุนี้ออกจากคลัง?')) {
-            await db.collection('masterDb').doc(id).delete();
-            await fetchMasterDb();
+            try {
+                await db.collection('masterDb').doc(id).delete();
+                await fetchMasterDb();
+            } catch(e) { console.error(e); alert('ลบพัสดุไม่สำเร็จ: ' + (e.message || e)); }
         }
     }
 
@@ -796,15 +845,16 @@
         list.innerHTML = '';
         masterDb.forEach(d => {
             const opt = document.createElement('option');
-            opt.value = `[${d.code}] ${d.name}`;
+            opt.value = `[${safeStr(d.code)}] ${safeStr(d.name)}`;
             list.appendChild(opt);
         });
     }
 
     function openModal(id) {
         const item = masterDb.find(d => d.id === id);
-        document.getElementById('modalTitle').innerText = `[${item.code}] ${item.name}`;
-        document.getElementById('modalDetail').innerText = `น้ำหนักต่อหน่วย: ${item.unitWeight} กก.`;
+        if (!item) return;
+        document.getElementById('modalTitle').innerText = `[${safeStr(item.code)}] ${safeStr(item.name)}`;
+        document.getElementById('modalDetail').innerText = `น้ำหนักต่อหน่วย: ${safeNum(item.unitWeight)} กก.`;
         document.getElementById('modalImage').src = item.image || 'https://via.placeholder.com/300?text=No+Image';
         const modal = document.getElementById('imageModal');
         modal.classList.remove('hidden', 'modal-out');
