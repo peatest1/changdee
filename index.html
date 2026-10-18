@@ -609,9 +609,9 @@
         }
     }
 
-    // โมเดลหลักและโมเดลสำรอง (เบากว่า โควต้าฟรีมักสูงกว่า) ใช้ตอนโมเดลหลักติดลิมิต
-    const GEMINI_MODEL_PRIMARY = "gemini-3.6-flash";
-    const GEMINI_MODEL_FALLBACK = "gemini-2.5-flash-lite";
+    // โมเดลหลักและโมเดลสำรอง (เรียงลำดับ) ใช้ตอนโมเดลหลักติดลิมิตหรือเซิร์ฟเวอร์โหลดสูง (503)
+    // หมายเหตุ: ถ้า Google ปลดระวางโมเดลใดในนี้ ข้อความ error 404 ที่ได้กลับมามักจะบอกชื่อโมเดลทดแทนตรงๆ
+    const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
 
     function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
 
@@ -648,11 +648,12 @@
     // เรียก Gemini พร้อมลองใหม่อัตโนมัติเมื่อติดลิมิตชั่วคราว (429/503) และสลับไปโมเดลสำรอง
     // ถ้าโมเดลหลักติดลิมิตต่อเนื่อง — ช่วยลดโอกาสที่ผู้ใช้จะเจอ error ตรงๆ จากการชนโควต้ารายนาที
     async function callGeminiWithRetry(contents, onStatus) {
-        const models = [GEMINI_MODEL_PRIMARY, GEMINI_MODEL_FALLBACK];
-        const delays = [4000, 8000]; // หน่วงรอก่อนลองใหม่ (ms) เผื่อโควต้าต่อนาทีรีเซ็ต
+        const models = GEMINI_MODELS;
+        const delays = [4000, 8000]; // หน่วงรอก่อนลองใหม่ (ms) เผื่อโควต้าต่อนาทีรีเซ็ต/เซิร์ฟเวอร์โหลดลดลง
 
         for (let m = 0; m < models.length; m++) {
             const modelName = models[m];
+            const hasNextModel = m < models.length - 1;
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
 
             for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -667,23 +668,29 @@
 
                 if (response.ok) return await response.json();
 
-                const isRateLimited = response.status === 429 || response.status === 503;
+                // 429 = ชนโควต้า, 503 = เซิร์ฟเวอร์ Google โหลดสูงชั่วคราว — ทั้งสองแบบลองใหม่ได้
+                const isTransient = response.status === 429 || response.status === 503;
+                // 404 = โมเดลนี้ถูกปลดระวางหรือไม่มีสิทธิ์ใช้แล้ว — ลองซ้ำโมเดลเดิมไปก็ไม่มีประโยชน์ ข้ามไปโมเดลถัดไปเลย
+                const isModelGone = response.status === 404;
                 const errText = await response.text();
                 console.error(`API Error (model=${modelName}, attempt=${attempt}):`, response.status, errText);
 
-                if (isRateLimited && attempt < delays.length) {
+                if (isTransient && attempt < delays.length) {
                     if (onStatus) onStatus(`⏳ AI ติดขีดจำกัดชั่วคราว กำลังลองใหม่ใน ${delays[attempt] / 1000} วินาที...`);
                     await sleep(delays[attempt]);
                     continue; // ลองโมเดลเดิมอีกครั้ง
                 }
 
-                if (isRateLimited && m < models.length - 1) {
-                    if (onStatus) onStatus(`⏳ โมเดลหลักติดขีดจำกัด กำลังสลับไปใช้โมเดลสำรอง...`);
+                if ((isTransient || isModelGone) && hasNextModel) {
+                    if (onStatus) onStatus(`⏳ โมเดล ${modelName} ใช้งานไม่ได้ชั่วคราว กำลังสลับไปใช้โมเดลสำรอง...`);
                     break; // ไปลองโมเดลถัดไปใน for ข้างนอก
                 }
 
-                if (isRateLimited) {
+                if (isTransient) {
                     throw new Error("ถึงขีดจำกัดการใช้งาน AI แล้ว (Free tier ของ Gemini มีโควต้าจำกัดต่อนาที/ต่อวัน) กรุณารอสักครู่แล้วลองใหม่ หรือกรอกรายการด้วยมือไปก่อน");
+                }
+                if (isModelGone) {
+                    throw new Error("โมเดล AI ที่ตั้งค่าไว้ใช้งานไม่ได้แล้วทุกตัว อาจถูกปลดระวางจากผู้ให้บริการ กรุณาตรวจสอบรายชื่อโมเดลที่รองรับ");
                 }
                 throw new Error(`API Error ${response.status}`);
             }
