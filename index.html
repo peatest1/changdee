@@ -315,6 +315,23 @@
     function safeStr(v) { return (v === null || v === undefined) ? '' : String(v); }
     function safeNum(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
 
+    // ตัดอักขระที่ไม่ใช่ตัวอักษร/ตัวเลขออกทั้งหมด (ขีด จุด ช่องว่าง ฯลฯ) แล้วปรับเป็นตัวพิมพ์ใหญ่
+    // เพื่อให้เทียบรหัสพัสดุได้แม้รูปแบบการพิมพ์ไม่ตรงกันเป๊ะ
+    function normalizeCode(v) {
+        return safeStr(v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+
+    // เทียบรหัสพัสดุแบบยืดหยุ่น: ตรงกันเป๊ะ หรือรหัสหนึ่งเป็นคำนำหน้าของอีกรหัส (กันกรณี AI สแกน
+    // ได้ตัวต่อท้าย เช่น "NA" หรือช่องว่างเกิน) โดยกำหนดความยาวขั้นต่ำไว้กันรหัสสั้นจับคู่ผิดคน
+    function codesMatch(a, b) {
+        const na = normalizeCode(a);
+        const nb = normalizeCode(b);
+        if (!na || !nb) return false;
+        if (na === nb) return true;
+        const minLen = Math.min(na.length, nb.length);
+        return minLen >= 5 && (na.startsWith(nb) || nb.startsWith(na));
+    }
+
     db.collection('folders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
         folders = [];
         snapshot.forEach(doc => folders.push({ id: doc.id, ...doc.data() }));
@@ -519,11 +536,7 @@
 
         if(!name || weight <= 0) return alert('กรุณากรอกรายการและน้ำหนักให้ถูกต้อง');
 
-        const cleanInput = name.replace(/-/g, '').toLowerCase().trim();
-        const found = masterDb.find(d => {
-            const cleanCode = safeStr(d.code).replace(/-/g, '').toLowerCase();
-            return cleanCode === cleanInput || (d.code && name.includes(d.code));
-        });
+        const found = masterDb.find(d => codesMatch(d.code, name) || (d.code && name.includes(d.code)));
 
         if (found && !name.includes(safeStr(found.name))) {
             name = `[${safeStr(found.code)}] ${safeStr(found.name)}`;
@@ -570,16 +583,14 @@
     }
 
     function onItemSelect(val) {
-        const cleanVal = val.replace(/-/g, '').toLowerCase().trim();
-        if (!cleanVal) {
+        if (!val.trim()) {
             selectedUnitWeight = 0;
             return;
         }
 
         const found = masterDb.find(d => {
-            const cleanCode = safeStr(d.code).replace(/-/g, '').toLowerCase();
             const fullText = `[${safeStr(d.code)}] ${safeStr(d.name)}`.toLowerCase();
-            return cleanCode === cleanVal || fullText === val.toLowerCase();
+            return codesMatch(d.code, val) || fullText === val.toLowerCase();
         });
 
         if (found) {
@@ -598,6 +609,88 @@
         }
     }
 
+    // โมเดลหลักและโมเดลสำรอง (เบากว่า โควต้าฟรีมักสูงกว่า) ใช้ตอนโมเดลหลักติดลิมิต
+    const GEMINI_MODEL_PRIMARY = "gemini-3.6-flash";
+    const GEMINI_MODEL_FALLBACK = "gemini-2.5-flash-lite";
+
+    function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+    // ย่อขนาดรูปก่อนส่งให้ AI วิเคราะห์ (ไม่กระทบรูปต้นฉบับ) เพื่อลดปริมาณข้อมูลที่ส่ง
+    // ช่วยให้ส่งเร็วขึ้นบนเน็ตมือถือ และลดโอกาสเจอปัญหาคำขอใหญ่เกินไป/หมดเวลา
+    function resizeImageForScan(file, maxDim = 1600, quality = 0.85) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                let { width, height } = img;
+                if (width <= maxDim && height <= maxDim) {
+                    // รูปเล็กอยู่แล้ว ไม่ต้องย่อ ส่งไฟล์เดิมตรงๆ
+                    return fileToBase64(file).then(resolve).catch(reject);
+                }
+                const scale = Math.min(maxDim / width, maxDim / height);
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(width * scale);
+                canvas.height = Math.round(height * scale);
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                // ย่อไม่สำเร็จ ใช้ไฟล์ต้นฉบับแทนแทนที่จะทำให้การสแกนล้มเหลวไปเลย
+                fileToBase64(file).then(resolve).catch(reject);
+            };
+            img.src = url;
+        });
+    }
+
+    // เรียก Gemini พร้อมลองใหม่อัตโนมัติเมื่อติดลิมิตชั่วคราว (429/503) และสลับไปโมเดลสำรอง
+    // ถ้าโมเดลหลักติดลิมิตต่อเนื่อง — ช่วยลดโอกาสที่ผู้ใช้จะเจอ error ตรงๆ จากการชนโควต้ารายนาที
+    async function callGeminiWithRetry(contents, onStatus) {
+        const models = [GEMINI_MODEL_PRIMARY, GEMINI_MODEL_FALLBACK];
+        const delays = [4000, 8000]; // หน่วงรอก่อนลองใหม่ (ms) เผื่อโควต้าต่อนาทีรีเซ็ต
+
+        for (let m = 0; m < models.length; m++) {
+            const modelName = models[m];
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
+
+            for (let attempt = 0; attempt <= delays.length; attempt++) {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents,
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+
+                if (response.ok) return await response.json();
+
+                const isRateLimited = response.status === 429 || response.status === 503;
+                const errText = await response.text();
+                console.error(`API Error (model=${modelName}, attempt=${attempt}):`, response.status, errText);
+
+                if (isRateLimited && attempt < delays.length) {
+                    if (onStatus) onStatus(`⏳ AI ติดขีดจำกัดชั่วคราว กำลังลองใหม่ใน ${delays[attempt] / 1000} วินาที...`);
+                    await sleep(delays[attempt]);
+                    continue; // ลองโมเดลเดิมอีกครั้ง
+                }
+
+                if (isRateLimited && m < models.length - 1) {
+                    if (onStatus) onStatus(`⏳ โมเดลหลักติดขีดจำกัด กำลังสลับไปใช้โมเดลสำรอง...`);
+                    break; // ไปลองโมเดลถัดไปใน for ข้างนอก
+                }
+
+                if (isRateLimited) {
+                    throw new Error("ถึงขีดจำกัดการใช้งาน AI แล้ว (Free tier ของ Gemini มีโควต้าจำกัดต่อนาที/ต่อวัน) กรุณารอสักครู่แล้วลองใหม่ หรือกรอกรายการด้วยมือไปก่อน");
+                }
+                throw new Error(`API Error ${response.status}`);
+            }
+        }
+        throw new Error("เรียกใช้งาน AI ไม่สำเร็จ");
+    }
+
     async function scanDocumentWithAI() {
         const fileInput = document.getElementById('scanDocInput');
         if(!fileInput.files || !fileInput.files[0]) return alert('กรุณาเลือกหรือถ่ายรูปภาพเอกสารก่อนครับ');
@@ -607,7 +700,7 @@
 
         const statusEl = document.getElementById('scanStatus');
         const scanBtn = document.getElementById('scanBtn');
-        
+
         statusEl.innerText = "⏳ AI กำลังอ่านและวิเคราะห์ตารางเอกสาร...";
         statusEl.classList.remove('hidden');
         statusEl.classList.remove('page-anim');
@@ -620,11 +713,9 @@
                 throw new Error("ไม่พบ API Key กรุณาตรวจสอบการตั้งค่าตัวแปร aiApiKey");
             }
 
-            const base64Image = await fileToBase64(fileInput.files[0]);
-            const base64Data = base64Image.split(',')[1];
-            
-            const modelName = "gemini-3.6-flash";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${aiApiKey}`;
+            const resizedDataUrl = await resizeImageForScan(fileInput.files[0]);
+            const base64Data = resizedDataUrl.split(',')[1];
+            const mimeType = resizedDataUrl.startsWith('data:image/jpeg') ? 'image/jpeg' : fileInput.files[0].type;
 
             const prompt = `วิเคราะห์ภาพเอกสารใบสำรวจรื้อถอนพัสดุของการไฟฟ้าส่วนภูมิภาค ให้ดึงข้อมูลรายการพัสดุออกมา อ้างอิงดังนี้:
 1. 'code': คอลัมน์รหัสพัสดุ (เช่น 1-00-001-0004 NA)
@@ -634,27 +725,10 @@
 ตอบกลับเฉพาะรูปแบบ JSON เท่านั้น ห้ามมีข้อความอื่น:
 {"items": [{"code": "1-00-001-0004 NA", "name": "POLE 12 M.", "qty": 22}]}`;
 
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ 
-                        parts: [ 
-                            { text: prompt }, 
-                            { inlineData: { mimeType: fileInput.files[0].type, data: base64Data } } 
-                        ]
-                    }],
-                    generationConfig: { responseMimeType: "application/json" }
-                })
-            });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                console.error("API Detail Error:", errText);
-                throw new Error(`API Error ${response.status}`);
-            }
-            
-            const data = await response.json();
+            const data = await callGeminiWithRetry(
+                [{ parts: [ { text: prompt }, { inlineData: { mimeType, data: base64Data } } ] }],
+                (msg) => { statusEl.innerText = msg; }
+            );
             const textRaw = data && data.candidates && data.candidates[0] && data.candidates[0].content
                 && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
                 ? data.candidates[0].content.parts[0].text
@@ -681,9 +755,10 @@
             scannedItems.forEach(scanned => {
                 if(!scanned.code && !scanned.name) return; 
                 
-                // ป้องกันแอปพังถ้าพัสดุในคลังบางรายการไม่มี code/name (ข้อมูลเพี้ยน)
-                const matchInDb = masterDb.find(d => 
-                    (scanned.code && safeStr(d.code).replace(/-/g,'').toLowerCase() === String(scanned.code).replace(/-/g,'').toLowerCase()) || 
+                // จับคู่แบบยืดหยุ่น: รหัสไม่ต้องตรงเป๊ะทุกตัวอักษร (กันขีด ช่องว่าง ตัวต่อท้ายที่ AI สแกนเพี้ยนไปบ้าง)
+                // ถ้ารหัสตรงกันแล้วถือว่าจับคู่ได้เลย ไม่ต้องพึ่งชื่อให้ตรงด้วย
+                const matchInDb = masterDb.find(d =>
+                    (scanned.code && codesMatch(d.code, scanned.code)) ||
                     (scanned.name && safeStr(d.name).toLowerCase().includes(String(scanned.name).toLowerCase()))
                 );
                 
