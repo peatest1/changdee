@@ -225,26 +225,18 @@
 
                 <div class="mb-6 bg-slate-50 p-4 rounded-2xl border-2 border-slate-900 no-print">
                     <h3 class="text-sm font-bold text-slate-900 mb-3">➕ เพิ่มรายการด้วยมือ</h3>
+                    <!-- น้ำหนักต่อหน่วยและประเภทดึงมาจากคลังพัสดุอัตโนมัติตามรหัสที่เลือก ผู้ใช้กรอกแค่พัสดุและจำนวนเท่านั้น -->
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                        <div class="md:col-span-5">
+                        <div class="md:col-span-9">
                             <input type="text" id="calcItemName" list="masterDatalist" placeholder="ค้นหารหัส/ชื่อพัสดุ..." oninput="onItemSelect(this.value)" onkeydown="handleNameKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium focus:outline-none">
                             <datalist id="masterDatalist"></datalist>
                         </div>
                         <div class="md:col-span-3">
-                            <!-- ระบบจะเลือกประเภทให้อัตโนมัติตามพัสดุที่เลือกจากคลัง แต่ปรับเองได้ก่อนกดเพิ่ม -->
-                            <select id="calcItemCategory" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
-                                <option value="เศษเหล็ก">เศษเหล็ก</option>
-                                <option value="เศษสาย">เศษสาย</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-2">
-                            <input type="number" id="calcItemQty" placeholder="จำนวน" value="1" oninput="calculateRowWeight()" onkeydown="handleQtyKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
-                        </div>
-                        <div class="md:col-span-2">
-                            <input type="number" id="calcItemWeight" placeholder="น้ำหนักรวม (กก.)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
+                            <input type="number" id="calcItemQty" placeholder="จำนวน" value="1" oninput="updateCalcItemPreview()" onkeydown="handleQtyKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
                         </div>
                     </div>
-                    <button onclick="addItemToFolder()" id="addItemBtn" class="btn-pop mt-3 w-full bg-slate-900 text-white font-bold text-sm py-2.5 px-4 rounded-xl cursor-pointer hover:bg-slate-800 transition">เพิ่มเข้าแฟ้ม</button>
+                    <p id="calcItemPreview" class="text-xs font-bold text-slate-500 mt-2 h-4"></p>
+                    <button onclick="addItemToFolder()" id="addItemBtn" class="btn-pop mt-1 w-full bg-slate-900 text-white font-bold text-sm py-2.5 px-4 rounded-xl cursor-pointer hover:bg-slate-800 transition">เพิ่มเข้าแฟ้ม</button>
                 </div>
 
                 <div class="mb-6 rounded-2xl border-2 border-slate-900 overflow-hidden bg-white">
@@ -339,6 +331,7 @@
     let masterDb = [];
     let currentFolderId = null;
     let selectedUnitWeight = 0;
+    let selectedCategory = null; // ประเภทของพัสดุที่กำลังเลือกอยู่ ดึงมาจากคลังพัสดุโดยอัตโนมัติ (ไม่ให้ผู้ใช้กรอกเอง)
     
     // ⚡ โมเดลที่ใช้งานจริง (ตรวจสอบแล้วว่าเป็น Model ID ที่ถูกต้องสำหรับ Gemini API)
 	const aiApiKey = atob('QUl6YVN5QXViQXNuMHpOSFJzRHZaM3p1T21JSklCM09VMzJqS2Nr');
@@ -583,20 +576,24 @@
 
         const nameInput = document.getElementById('calcItemName');
         const qtyInput = document.getElementById('calcItemQty');
-        const weightInput = document.getElementById('calcItemWeight');
-        const categorySelect = document.getElementById('calcItemCategory');
 
         let name = nameInput.value.trim();
         const qty = parseFloat(qtyInput.value) || 1;
-        const weight = parseFloat(weightInput.value) || 0;
-        const category = categorySelect ? categorySelect.value : DEFAULT_CATEGORY;
         const btn = document.getElementById('addItemBtn');
 
-        if(!name || weight <= 0) return alert('กรุณากรอกรายการและน้ำหนักให้ถูกต้อง');
+        if (!name) return alert('กรุณาค้นหาและเลือกพัสดุจากคลังก่อน');
 
         const found = masterDb.find(d => codesMatch(d.code, name) || (d.code && name.includes(d.code)));
+        if (!found) return alert('ไม่พบรหัสพัสดุนี้ในคลัง กรุณาเลือกจากรายการที่ขึ้นให้ หรือเพิ่มพัสดุนี้เข้าคลังก่อน');
 
-        if (found && !name.includes(safeStr(found.name))) {
+        // น้ำหนักรวมและประเภท ดึงจากคลังพัสดุเสมอ ไม่รับค่าที่ผู้ใช้กรอกเอง
+        const unitWeight = safeNum(found.unitWeight);
+        const weight = qty * unitWeight;
+        const category = itemCategory(found);
+
+        if (!(weight > 0)) return alert('พัสดุนี้ยังไม่มีน้ำหนักต่อหน่วยในคลัง กรุณาไปแก้ไขที่หน้าคลังพัสดุก่อน');
+
+        if (!name.includes(safeStr(found.name))) {
             name = `[${safeStr(found.code)}] ${safeStr(found.name)}`;
         }
 
@@ -609,9 +606,9 @@
 
             nameInput.value = '';
             qtyInput.value = '1';
-            weightInput.value = '';
-            if (categorySelect) categorySelect.value = DEFAULT_CATEGORY;
             selectedUnitWeight = 0;
+            selectedCategory = null;
+            updateCalcItemPreview();
             nameInput.focus();
         } catch(e) { console.error(e); alert('อัปเดตข้อมูลล้มเหลว: ' + (e.message || e)); }
         finally { btn.disabled = false; btn.innerText = 'เพิ่มเข้าแฟ้ม'; }
@@ -644,6 +641,8 @@
     function onItemSelect(val) {
         if (!val.trim()) {
             selectedUnitWeight = 0;
+            selectedCategory = null;
+            updateCalcItemPreview();
             return;
         }
 
@@ -654,20 +653,25 @@
 
         if (found) {
             selectedUnitWeight = safeNum(found.unitWeight);
+            selectedCategory = itemCategory(found);
             document.getElementById('calcItemName').value = `[${safeStr(found.code)}] ${safeStr(found.name)}`;
-            // ตั้งประเภทให้ตรงกับที่กำหนดไว้ในคลังพัสดุโดยอัตโนมัติ (ยังแก้เองได้ก่อนกดเพิ่ม)
-            const categorySelect = document.getElementById('calcItemCategory');
-            if (categorySelect) categorySelect.value = itemCategory(found);
-            calculateRowWeight();
         } else {
             selectedUnitWeight = 0;
+            selectedCategory = null;
         }
+        updateCalcItemPreview();
     }
 
-    function calculateRowWeight() {
-        if (selectedUnitWeight > 0) {
+    // แสดงตัวอย่างน้ำหนักรวม/ประเภทที่จะถูกดึงมาจากคลังพัสดุ ให้ผู้ใช้เห็นก่อนกดเพิ่ม (อ่านอย่างเดียว แก้ไม่ได้ตรงนี้)
+    function updateCalcItemPreview() {
+        const el = document.getElementById('calcItemPreview');
+        if (!el) return;
+        if (selectedUnitWeight > 0 && selectedCategory) {
             const qty = parseFloat(document.getElementById('calcItemQty').value) || 0;
-            document.getElementById('calcItemWeight').value = (qty * selectedUnitWeight).toFixed(2);
+            const totalWeight = (qty * selectedUnitWeight).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            el.innerText = `น้ำหนักรวม ${totalWeight} กก. · ${selectedCategory} (ดึงจากคลังพัสดุ)`;
+        } else {
+            el.innerText = '';
         }
     }
 
