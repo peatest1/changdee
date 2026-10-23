@@ -143,41 +143,10 @@
                 box-shadow: none;
                 min-height: 100vh;
             }
-            /* ตารางที่กว้างเกินจอ (คลังพัสดุ/รายการในแฟ้มงาน) เปลี่ยนเป็นการ์ดเรียงตามแนวตั้งแทน
-               เพื่อไม่ให้ต้องเลื่อนซ้ายขวาดูข้อมูลที่ถูกตัดขอบ */
-            .mobile-stack-table, .mobile-stack-table * { overflow-x: visible !important; }
-            .mobile-stack-table table { display: block; width: 100%; }
-            .mobile-stack-table thead { display: none; }
-            .mobile-stack-table tbody { display: block; }
-            .mobile-stack-table tr {
-                display: block;
-                border: 2px solid #1E293B;
-                border-radius: 14px;
-                margin-bottom: 10px;
-                padding: 6px 0;
-                background: #fff;
-            }
-            .mobile-stack-table tr:last-child { margin-bottom: 0; }
-            .mobile-stack-table td {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                gap: 10px;
-                text-align: right !important;
-                border: none !important;
-                padding: 8px 12px !important;
-            }
-            .mobile-stack-table td[data-label]::before {
-                content: attr(data-label);
-                font-size: 11px;
-                font-weight: 700;
-                color: #64748B;
-                text-align: left;
-                flex-shrink: 0;
-            }
-            /* แถวข้อความแจ้งเตือน/ว่างเปล่าที่ไม่มี data-label ให้แสดงกึ่งกลางเต็มแถวตามเดิม ไม่ใช่ชิดขวา */
-            .mobile-stack-table td:not([data-label]) { display: block; text-align: center !important; }
         }
+
+        /* ===== รายการพัสดุ/คลังพัสดุ: ลิสต์แบบ 2 บรรทัดต่อรายการ ไม่มีเส้นแบ่งในรายการ มีแค่เส้นบางๆคั่นระหว่างรายการ ===== */
+        .item-row-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body class="min-h-screen p-3 md:p-6">
@@ -278,19 +247,8 @@
                     <button onclick="addItemToFolder()" id="addItemBtn" class="btn-pop mt-3 w-full bg-slate-900 text-white font-bold text-sm py-2.5 px-4 rounded-xl cursor-pointer hover:bg-slate-800 transition">เพิ่มเข้าแฟ้ม</button>
                 </div>
 
-                <div class="overflow-x-auto mb-6 rounded-2xl border-2 border-slate-900 mobile-stack-table">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="brand-yellow text-slate-900 text-xs font-bold uppercase tracking-wider border-b-2 border-slate-900">
-                                <th class="p-3">รหัส / รายการพัสดุ</th>
-                                <th class="p-3 text-center">ประเภท</th>
-                                <th class="p-3 text-center">จำนวนรื้อถอน</th>
-                                <th class="p-3 text-right">น้ำหนักรวม (กก.)</th>
-                                <th class="p-3 text-center no-print">จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="calcItemList" class="divide-y-2 divide-slate-100 text-sm font-medium"></tbody>
-                    </table>
+                <div class="mb-6 rounded-2xl border-2 border-slate-900 overflow-hidden bg-white">
+                    <div id="calcItemList" class="divide-y divide-slate-100"></div>
                 </div>
 
                 <!-- สรุปยอดแยกตามประเภท แสดงก่อนยอดรวมทั้งสิ้น -->
@@ -338,20 +296,8 @@
                     </div>
                 </div>
 
-                <div class="overflow-x-auto rounded-2xl border-2 border-slate-900 mobile-stack-table">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="brand-yellow text-slate-900 text-xs font-bold uppercase tracking-wider border-b-2 border-slate-900">
-                                <th class="p-3">รูปภาพ</th>
-                                <th class="p-3">รหัสพัสดุ</th>
-                                <th class="p-3">ชื่อพัสดุ</th>
-                                <th class="p-3 text-center">ประเภท</th>
-                                <th class="p-3 text-right">น้ำหนัก/หน่วย (กก.)</th>
-                                <th class="p-3 text-center">จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dbTableList" class="divide-y-2 divide-slate-100 text-sm font-medium"></tbody>
-                    </table>
+                <div class="rounded-2xl border-2 border-slate-900 overflow-hidden bg-white">
+                    <div id="dbTableList" class="divide-y divide-slate-100"></div>
                 </div>
             </div>
         </div>
@@ -443,7 +389,7 @@
             console.error("Fetch MasterDb Error:", e);
             const tbody = document.getElementById('dbTableList');
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-500 font-bold">⚠️ โหลดข้อมูลคลังพัสดุไม่สำเร็จ: ${e.message || e}</td></tr>`;
+                tbody.innerHTML = `<div class="p-6 text-center text-red-500 font-bold text-sm">⚠️ โหลดข้อมูลคลังพัสดุไม่สำเร็จ: ${e.message || e}</div>`;
             }
         }
     }
@@ -562,24 +508,26 @@
         const byCategory = {}; // ยอดน้ำหนักแยกตามประเภท เช่น { 'เศษเหล็ก': 120.5, 'เศษสาย': 30 }
 
         if(!folder.items || folder.items.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</td></tr>`;
+            tbody.innerHTML = `<div class="p-6 text-center text-slate-400 font-bold text-sm">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</div>`;
         } else {
             let htmlContent = '';
             folder.items.forEach((item, index) => {
                 const itemWeight = safeNum(item.weight);
                 const category = itemCategory(item);
+                const catColor = category === 'เศษสาย' ? 'text-teal-700' : 'text-slate-500';
                 totalWeight += itemWeight;
                 byCategory[category] = (byCategory[category] || 0) + itemWeight;
                 htmlContent += `
-                    <tr style="animation-delay:${Math.min(index, 14) * 30}ms" class="row-fade hover:bg-slate-50 transition-colors">
-                        <td class="p-3 text-slate-900" data-label="รหัส / รายการพัสดุ">${safeStr(item.name)}</td>
-                        <td class="p-3 text-center text-slate-700" data-label="ประเภท">${category}</td>
-                        <td class="p-3 text-center text-slate-700" data-label="จำนวนรื้อถอน">${safeStr(item.qty)}</td>
-                        <td class="p-3 text-right font-bold text-slate-900" data-label="น้ำหนักรวม (กก.)">${itemWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                        <td class="p-3 text-center no-print" data-label="จัดการ">
-                            <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110">ลบ</button>
-                        </td>
-                    </tr>
+                    <div style="animation-delay:${Math.min(index, 14) * 30}ms" class="row-fade px-4 py-3 hover:bg-slate-50 transition-colors">
+                        <div class="flex justify-between items-start gap-3">
+                            <div class="item-row-name text-sm font-bold text-slate-900">${safeStr(item.name)}</div>
+                            <div class="text-sm font-black text-slate-900 flex-shrink-0">${itemWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        </div>
+                        <div class="flex justify-between items-center gap-3 mt-0.5">
+                            <div class="text-xs font-semibold ${catColor}">จำนวน ${safeStr(item.qty)} · ${category}</div>
+                            <button onclick="removeItemFromFolder(${index})" class="no-print text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110 flex-shrink-0">ลบ</button>
+                        </div>
+                    </div>
                 `;
             });
             tbody.innerHTML = htmlContent;
@@ -969,7 +917,7 @@
         }
 
         if(filteredDb.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 font-bold">ไม่พบรายการพัสดุที่ค้นหา</td></tr>`;
+            tbody.innerHTML = `<div class="p-6 text-center text-slate-400 font-bold text-sm">ไม่พบรายการพัสดุที่ค้นหา</div>`;
             return;
         }
 
@@ -977,23 +925,29 @@
         let htmlContent = '';
 
         displayList.forEach((d, i) => {
-            const imgTag = d.image 
-                ? `<img src="${d.image}" class="w-10 h-10 object-cover rounded-xl cursor-pointer border-2 border-slate-900 transition hover:scale-110" onclick="openModal('${d.id}')">`
-                : `<span class="text-xs text-slate-400">ไม่มีรูป</span>`;
+            const imgTag = d.image
+                ? `<img src="${d.image}" class="w-full h-full object-cover cursor-pointer" onclick="openModal('${d.id}')">`
+                : `<span class="text-slate-400 text-[9px] text-center leading-tight">ไม่มีรูป</span>`;
+            const cat = itemCategory(d);
+            const catBadge = cat === 'เศษสาย' ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-600';
 
             // ป้องกันแอปพังทั้งหน้าถ้ามีรายการในคลังที่ไม่มี unitWeight เป็นตัวเลข (ข้อมูลเพี้ยน)
             htmlContent += `
-                <tr style="animation-delay:${Math.min(i, 14) * 25}ms" class="row-fade hover:bg-slate-50 transition-colors">
-                    <td class="p-3 text-center" data-label="รูปภาพ">${imgTag}</td>
-                    <td class="p-3 font-bold text-slate-900" data-label="รหัสพัสดุ">${safeStr(d.code)}</td>
-                    <td class="p-3 text-slate-800" data-label="ชื่อพัสดุ">${safeStr(d.name)}</td>
-                    <td class="p-3 text-center text-slate-700" data-label="ประเภท">${itemCategory(d)}</td>
-                    <td class="p-3 text-right font-bold text-slate-900" data-label="น้ำหนัก/หน่วย (กก.)">${safeNum(d.unitWeight).toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
-                    <td class="p-3 text-center" data-label="จัดการ">
-                        <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs mr-2 cursor-pointer transition hover:scale-110 inline-block">แก้ไข</button>
-                        <button onclick="deleteDbItem('${d.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110 inline-block">ลบ</button>
-                    </td>
-                </tr>
+                <div style="animation-delay:${Math.min(i, 14) * 25}ms" class="row-fade flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                    <div class="w-11 h-11 rounded-xl border-2 border-slate-900 flex-shrink-0 overflow-hidden bg-slate-100 flex items-center justify-center">${imgTag}</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="item-row-name text-sm font-bold text-slate-900">${safeStr(d.name)}</div>
+                        <div class="text-xs text-slate-500 mt-0.5">${safeStr(d.code)}</div>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${catBadge}">${cat}</span>
+                            <span class="text-xs font-black text-slate-900">${safeNum(d.unitWeight).toLocaleString(undefined, {minimumFractionDigits: 3})} กก./หน่วย</span>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 flex flex-col gap-1.5 items-end">
+                        <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs cursor-pointer transition hover:scale-110">แก้ไข</button>
+                        <button onclick="deleteDbItem('${d.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110">ลบ</button>
+                    </div>
+                </div>
             `;
         });
 
