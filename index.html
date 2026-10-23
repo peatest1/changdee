@@ -2,7 +2,8 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ปิดการซูมด้วยนิ้ว/double-tap และยึด scale ไว้ที่ 1 เสมอ เพื่อให้รู้สึกเหมือนแอปจริง ไม่ใช่หน้าเว็บที่ซูมได้ -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ชั่งดี - ระบบคำนวณและสแกนน้ำหนักเศษเหล็ก</title>
 
     <!-- ตั้งค่า App Icon & PWA สำหรับ iOS และ Android -->
@@ -11,7 +12,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="ชั่งดี">
     <meta name="theme-color" content="#F5B837">
-    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F5B837'/><g transform='translate(10,10) scale(0.8)'><path d='M 20 20 Q 50 10 80 20 Q 80 35 50 35 Q 20 35 20 20 Z' fill='%23ffffff' stroke='%231E293B' stroke-width='5'/><rect x='42' y='32' width='16' height='10' fill='%23ffffff' stroke='%231E293B' stroke-width='5'/><path d='M 30 40 L 70 40 L 75 80 L 25 80 Z' fill='%23ffffff' stroke='%231E293B' stroke-width='5'/><circle cx='50' cy='60' r='16' fill='%23FDFBF7' stroke='%231E293B' stroke-width='5'/><line x1='50' y1='60' x2='50' y2='50' stroke='%231E293B' stroke-width='5' stroke-linecap='round'/><circle cx='50' cy='60' r='3' fill='%231E293B'/></g></svg>">
+    <!-- Favicon สำหรับแท็บเบราว์เซอร์ทั่วไป (SVG) และ PNG สำรองสำหรับเบราว์เซอร์ที่ไม่รองรับ favicon แบบ SVG -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F5B837'/><g transform='translate(10,10) scale(0.8)'><path d='M 20 20 Q 50 10 80 20 Q 80 35 50 35 Q 20 35 20 20 Z' fill='%23ffffff' stroke='%231E293B' stroke-width='5'/><rect x='42' y='32' width='16' height='10' fill='%23ffffff' stroke='%231E293B' stroke-width='5'/><path d='M 30 40 L 70 40 L 75 80 L 25 80 Z' fill='%23ffffff' stroke='%231E293B' stroke-width='5'/><circle cx='50' cy='60' r='16' fill='%23FDFBF7' stroke='%231E293B' stroke-width='5'/><line x1='50' y1='60' x2='50' y2='50' stroke='%231E293B' stroke-width='5' stroke-linecap='round'/><circle cx='50' cy='60' r='3' fill='%231E293B'/></g></svg>">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="shortcut icon" href="icon-192.png">
+    <!-- iOS ต้องใช้ PNG จริง (ไม่รองรับ SVG) สำหรับไอคอนตอนเพิ่มหน้าจอโฮม -->
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
 
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -23,10 +29,26 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 
     <style>
-        body { 
-            font-family: 'Prompt', sans-serif; 
+        /* ปิดพฤติกรรมแบบเว็บเบราว์เซอร์ที่ทำให้รู้สึกไม่เหมือนแอปจริง:
+           - pinch-zoom/double-tap-zoom (touch-action)
+           - เอฟเฟกต์ "ดึงลงเพื่อรีเฟรช" และการเด้งเมื่อเลื่อนสุดขอบจอ (overscroll-behavior)
+           - แสงไฮไลต์สีฟ้าเวลาแตะปุ่มบน Android/Chrome (-webkit-tap-highlight-color)
+           - การเลือก/ลากคัดลอกข้อความโดยไม่ตั้งใจเวลาแตะค้างปุ่มต่างๆ */
+        html, body {
+            overscroll-behavior: none;
+            touch-action: manipulation;
+            height: 100%;
+        }
+        * { -webkit-tap-highlight-color: transparent; }
+        button, .btn-pop, header, h1, h2, h3 {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        body {
+            font-family: 'Prompt', sans-serif;
             background-color: #FDFDF8;
             color: #1E293B;
+            -webkit-overflow-scrolling: touch;
         }
         .brand-yellow { background-color: #F5B837; }
         .brand-yellow-light { background-color: #FEF3D6; }
@@ -188,14 +210,21 @@
                 <div class="mb-6 bg-slate-50 p-4 rounded-2xl border-2 border-slate-900 no-print">
                     <h3 class="text-sm font-bold text-slate-900 mb-3">➕ เพิ่มรายการด้วยมือ</h3>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                        <div class="md:col-span-6">
+                        <div class="md:col-span-5">
                             <input type="text" id="calcItemName" list="masterDatalist" placeholder="ค้นหารหัส/ชื่อพัสดุ..." oninput="onItemSelect(this.value)" onkeydown="handleNameKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium focus:outline-none">
                             <datalist id="masterDatalist"></datalist>
                         </div>
                         <div class="md:col-span-3">
+                            <!-- ระบบจะเลือกประเภทให้อัตโนมัติตามพัสดุที่เลือกจากคลัง แต่ปรับเองได้ก่อนกดเพิ่ม -->
+                            <select id="calcItemCategory" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
+                                <option value="เศษเหล็ก">เศษเหล็ก</option>
+                                <option value="เศษสาย">เศษสาย</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
                             <input type="number" id="calcItemQty" placeholder="จำนวน" value="1" oninput="calculateRowWeight()" onkeydown="handleQtyKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
                         </div>
-                        <div class="md:col-span-3">
+                        <div class="md:col-span-2">
                             <input type="number" id="calcItemWeight" placeholder="น้ำหนักรวม (กก.)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
                         </div>
                     </div>
@@ -207,6 +236,7 @@
                         <thead>
                             <tr class="brand-yellow text-slate-900 text-xs font-bold uppercase tracking-wider border-b-2 border-slate-900">
                                 <th class="p-3">รหัส / รายการพัสดุ</th>
+                                <th class="p-3 text-center">ประเภท</th>
                                 <th class="p-3 text-center">จำนวนรื้อถอน</th>
                                 <th class="p-3 text-right">น้ำหนักรวม (กก.)</th>
                                 <th class="p-3 text-center no-print">จัดการ</th>
@@ -216,8 +246,11 @@
                     </table>
                 </div>
 
+                <!-- สรุปยอดแยกตามประเภท แสดงก่อนยอดรวมทั้งสิ้น -->
+                <div id="categoryBreakdownBox" class="grid grid-cols-2 gap-3 mb-3"></div>
+
                 <div id="totalWeightBox" class="weight-live brand-yellow text-slate-900 p-5 rounded-2xl border-2 border-slate-900 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(30,41,59,1)]">
-                    <span class="text-base font-bold">น้ำหนักรวมเศษเหล็กทั้งสิ้น:</span>
+                    <span class="text-base font-bold">น้ำหนักรวมเศษทั้งสิ้น:</span>
                     <div class="text-right">
                         <span id="folderTotalWeight" class="text-3xl font-black">0.00</span>
                         <span class="text-xs font-bold ml-1">กก.</span>
@@ -232,10 +265,15 @@
                     <input type="hidden" id="editDbId" value="">
                     <input type="hidden" id="editImageUrl" value="">
                     
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                         <input type="text" id="dbCode" placeholder="รหัสพัสดุ (เช่น ST-001)" class="px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
                         <input type="text" id="dbName" placeholder="ชื่อพัสดุ (เช่น เหล็กกล่อง 2x2 นิ้ว)" class="px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
                         <input type="number" id="dbUnitWeight" step="any" placeholder="น้ำหนักต่อหน่วย (กก./ชิ้น)" class="px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
+                        <!-- ประเภทพัสดุ — ใช้กำหนดว่าของชิ้นนี้นับเป็นเศษเหล็กหรือเศษสาย ตอนดึงเข้าแฟ้มงาน/สแกนด้วย AI จะยึดตามนี้ -->
+                        <select id="dbCategory" class="px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
+                            <option value="เศษเหล็ก">เศษเหล็ก</option>
+                            <option value="เศษสาย">เศษสาย</option>
+                        </select>
                     </div>
                     <div class="mb-3">
                         <input type="file" id="dbImageInput" accept="image/*" class="w-full text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-2 file:border-slate-900 file:text-xs file:font-bold file:bg-white file:text-slate-900 hover:file:bg-slate-100 cursor-pointer border-2 border-slate-900 rounded-xl bg-white p-1">
@@ -260,6 +298,7 @@
                                 <th class="p-3">รูปภาพ</th>
                                 <th class="p-3">รหัสพัสดุ</th>
                                 <th class="p-3">ชื่อพัสดุ</th>
+                                <th class="p-3 text-center">ประเภท</th>
                                 <th class="p-3 text-right">น้ำหนัก/หน่วย (กก.)</th>
                                 <th class="p-3 text-center">จัดการ</th>
                             </tr>
@@ -462,6 +501,10 @@
         container.innerHTML = htmlContent;
     }
 
+    // ประเภทพัสดุเริ่มต้นสำหรับรายการเก่าที่ยังไม่มีฟิลด์ category (ข้อมูลก่อนหน้านี้ทั้งหมดถูกนับเป็นเศษเหล็กอยู่แล้ว)
+    const DEFAULT_CATEGORY = 'เศษเหล็ก';
+    function itemCategory(item) { return safeStr(item.category) || DEFAULT_CATEGORY; }
+
     function renderCalcView() {
         const folder = folders.find(f => f.id === currentFolderId);
         if(!folder) return navTo('folders');
@@ -469,17 +512,21 @@
         document.getElementById('calcFolderName').innerText = `แฟ้มงาน: ${safeStr(folder.name)}`;
         const tbody = document.getElementById('calcItemList');
         let totalWeight = 0;
+        const byCategory = {}; // ยอดน้ำหนักแยกตามประเภท เช่น { 'เศษเหล็ก': 120.5, 'เศษสาย': 30 }
 
         if(!folder.items || folder.items.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</td></tr>`;
         } else {
             let htmlContent = '';
             folder.items.forEach((item, index) => {
                 const itemWeight = safeNum(item.weight);
+                const category = itemCategory(item);
                 totalWeight += itemWeight;
+                byCategory[category] = (byCategory[category] || 0) + itemWeight;
                 htmlContent += `
                     <tr style="animation-delay:${Math.min(index, 14) * 30}ms" class="row-fade hover:bg-slate-50 transition-colors">
                         <td class="p-3 text-slate-900">${safeStr(item.name)}</td>
+                        <td class="p-3 text-center text-slate-700">${category}</td>
                         <td class="p-3 text-center text-slate-700">${safeStr(item.qty)}</td>
                         <td class="p-3 text-right font-bold text-slate-900">${itemWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         <td class="p-3 text-center no-print">
@@ -491,7 +538,21 @@
             tbody.innerHTML = htmlContent;
         }
 
+        renderCategoryBreakdown(byCategory);
         animateWeightTo(totalWeight);
+    }
+
+    // แสดงยอดน้ำหนักแยกตามประเภท (เศษเหล็ก / เศษสาย) เป็นกล่องเล็กๆ เหนือยอดรวมทั้งสิ้น
+    function renderCategoryBreakdown(byCategory) {
+        const box = document.getElementById('categoryBreakdownBox');
+        if (!box) return;
+        const categories = ['เศษเหล็ก', 'เศษสาย'];
+        box.innerHTML = categories.map(cat => `
+            <div class="bg-slate-50 border-2 border-slate-900 rounded-xl p-3 flex justify-between items-center">
+                <span class="text-xs font-bold text-slate-600">${cat}</span>
+                <span class="text-base font-black text-slate-900">${safeNum(byCategory[cat]).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span class="text-xs font-bold">กก.</span></span>
+            </div>
+        `).join('');
     }
 
     function animateWeightTo(target) {
@@ -528,10 +589,12 @@
         const nameInput = document.getElementById('calcItemName');
         const qtyInput = document.getElementById('calcItemQty');
         const weightInput = document.getElementById('calcItemWeight');
-        
+        const categorySelect = document.getElementById('calcItemCategory');
+
         let name = nameInput.value.trim();
         const qty = parseFloat(qtyInput.value) || 1;
         const weight = parseFloat(weightInput.value) || 0;
+        const category = categorySelect ? categorySelect.value : DEFAULT_CATEGORY;
         const btn = document.getElementById('addItemBtn');
 
         if(!name || weight <= 0) return alert('กรุณากรอกรายการและน้ำหนักให้ถูกต้อง');
@@ -546,12 +609,13 @@
         btn.innerText = 'กำลังเพิ่ม...';
         try {
             const existingItems = folder.items || [];
-            const newItems = [...existingItems, { name, qty, weight }];
+            const newItems = [...existingItems, { name, qty, weight, category }];
             await db.collection('folders').doc(currentFolderId).update({ items: newItems });
-            
+
             nameInput.value = '';
             qtyInput.value = '1';
             weightInput.value = '';
+            if (categorySelect) categorySelect.value = DEFAULT_CATEGORY;
             selectedUnitWeight = 0;
             nameInput.focus();
         } catch(e) { console.error(e); alert('อัปเดตข้อมูลล้มเหลว: ' + (e.message || e)); }
@@ -595,7 +659,10 @@
 
         if (found) {
             selectedUnitWeight = safeNum(found.unitWeight);
-            document.getElementById('calcItemName').value = `[${safeStr(found.code)}] ${safeStr(found.name)}`; 
+            document.getElementById('calcItemName').value = `[${safeStr(found.code)}] ${safeStr(found.name)}`;
+            // ตั้งประเภทให้ตรงกับที่กำหนดไว้ในคลังพัสดุโดยอัตโนมัติ (ยังแก้เองได้ก่อนกดเพิ่ม)
+            const categorySelect = document.getElementById('calcItemCategory');
+            if (categorySelect) categorySelect.value = itemCategory(found);
             calculateRowWeight();
         } else {
             selectedUnitWeight = 0;
@@ -770,10 +837,12 @@
                 );
                 
                 const unitWeight = matchInDb ? safeNum(matchInDb.unitWeight) : 0;
+                // ยึดประเภทตามที่กำหนดไว้ในคลังพัสดุของรายการที่จับคู่ได้ ถ้าไม่พบในคลังจะเข้ากลุ่มเศษเหล็กเป็นค่าเริ่มต้น
+                const category = matchInDb ? itemCategory(matchInDb) : DEFAULT_CATEGORY;
                 const qty = parseFloat(scanned.qty) || 1;
                 const nameDisplay = scanned.code ? `[${scanned.code}] ${scanned.name || ''}` : scanned.name;
-                
-                newItemsToAdd.push({ name: nameDisplay, qty: qty, weight: parseFloat((qty * unitWeight).toFixed(2)) });
+
+                newItemsToAdd.push({ name: nameDisplay, qty: qty, weight: parseFloat((qty * unitWeight).toFixed(2)), category });
                 addedCount++;
             });
 
@@ -806,6 +875,7 @@
         const code = document.getElementById('dbCode').value.trim();
         const name = document.getElementById('dbName').value.trim();
         const unitWeight = parseFloat(document.getElementById('dbUnitWeight').value) || 0;
+        const category = document.getElementById('dbCategory').value;
         const fileInput = document.getElementById('dbImageInput');
         const editId = document.getElementById('editDbId').value;
         const existingImageUrl = document.getElementById('editImageUrl').value;
@@ -819,7 +889,7 @@
         try {
             const finalImageUrl = await uploadDbImageIfAny(fileInput, existingImageUrl);
 
-            const newItem = { code, name, unitWeight, image: finalImageUrl };
+            const newItem = { code, name, unitWeight, category, image: finalImageUrl };
 
             if (editId) {
                 await db.collection('masterDb').doc(editId).update(newItem);
@@ -870,6 +940,7 @@
                     <td class="p-3 text-center">${imgTag}</td>
                     <td class="p-3 font-bold text-slate-900">${safeStr(d.code)}</td>
                     <td class="p-3 text-slate-800">${safeStr(d.name)}</td>
+                    <td class="p-3 text-center text-slate-700">${itemCategory(d)}</td>
                     <td class="p-3 text-right font-bold text-slate-900">${safeNum(d.unitWeight).toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
                     <td class="p-3 text-center">
                         <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs mr-2 cursor-pointer transition hover:scale-110 inline-block">แก้ไข</button>
@@ -888,6 +959,7 @@
         document.getElementById('dbCode').value = safeStr(item.code);
         document.getElementById('dbName').value = safeStr(item.name);
         document.getElementById('dbUnitWeight').value = safeNum(item.unitWeight);
+        document.getElementById('dbCategory').value = itemCategory(item);
         document.getElementById('editDbId').value = item.id;
         document.getElementById('editImageUrl').value = item.image || '';
 
@@ -912,6 +984,7 @@
         document.getElementById('dbCode').value = '';
         document.getElementById('dbName').value = '';
         document.getElementById('dbUnitWeight').value = '';
+        document.getElementById('dbCategory').value = DEFAULT_CATEGORY;
         document.getElementById('dbImageInput').value = '';
         document.getElementById('editDbId').value = '';
         document.getElementById('editImageUrl').value = '';
@@ -936,7 +1009,7 @@
         const item = masterDb.find(d => d.id === id);
         if (!item) return;
         document.getElementById('modalTitle').innerText = `[${safeStr(item.code)}] ${safeStr(item.name)}`;
-        document.getElementById('modalDetail').innerText = `น้ำหนักต่อหน่วย: ${safeNum(item.unitWeight)} กก.`;
+        document.getElementById('modalDetail').innerText = `น้ำหนักต่อหน่วย: ${safeNum(item.unitWeight)} กก. · ประเภท: ${itemCategory(item)}`;
         document.getElementById('modalImage').src = item.image || 'https://via.placeholder.com/300?text=No+Image';
         const modal = document.getElementById('imageModal');
         modal.classList.remove('hidden', 'modal-out');
@@ -959,6 +1032,14 @@
             reader.onload = () => resolve(reader.result);
             reader.onerror = reject;
             reader.readAsDataURL(file);
+        });
+    }
+
+    // ลงทะเบียน Service Worker เพื่อให้เบราว์เซอร์ (โดยเฉพาะ Chrome/Android) เสนอให้ "ติดตั้งเป็นแอป"
+    // และช่วยให้เปิดแอปได้เร็วขึ้น/ใช้งานหน้าตาแอปได้แม้เน็ตหลุดชั่วคราว (ข้อมูลจริงยังต้องใช้เน็ตเสมอ)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed:', err));
         });
     }
 </script>
