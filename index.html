@@ -131,6 +131,53 @@
                 transition: none !important;
             }
         }
+
+        /* ===== หน้าจอมือถือ: เต็มจอแบบแอปจริง ไม่มีกรอบ/ขอบลอยเหมือนการ์ดบนเว็บ และไม่ต้องเลื่อนซ้ายขวา ===== */
+        @media (max-width: 767px) {
+            body { padding: 0; }
+            .app-shell {
+                max-width: 100%;
+                margin: 0;
+                border-radius: 0;
+                border-width: 0;
+                box-shadow: none;
+                min-height: 100vh;
+            }
+            /* ตารางที่กว้างเกินจอ (คลังพัสดุ/รายการในแฟ้มงาน) เปลี่ยนเป็นการ์ดเรียงตามแนวตั้งแทน
+               เพื่อไม่ให้ต้องเลื่อนซ้ายขวาดูข้อมูลที่ถูกตัดขอบ */
+            .mobile-stack-table, .mobile-stack-table * { overflow-x: visible !important; }
+            .mobile-stack-table table { display: block; width: 100%; }
+            .mobile-stack-table thead { display: none; }
+            .mobile-stack-table tbody { display: block; }
+            .mobile-stack-table tr {
+                display: block;
+                border: 2px solid #1E293B;
+                border-radius: 14px;
+                margin-bottom: 10px;
+                padding: 6px 0;
+                background: #fff;
+            }
+            .mobile-stack-table tr:last-child { margin-bottom: 0; }
+            .mobile-stack-table td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+                text-align: right !important;
+                border: none !important;
+                padding: 8px 12px !important;
+            }
+            .mobile-stack-table td[data-label]::before {
+                content: attr(data-label);
+                font-size: 11px;
+                font-weight: 700;
+                color: #64748B;
+                text-align: left;
+                flex-shrink: 0;
+            }
+            /* แถวข้อความแจ้งเตือน/ว่างเปล่าที่ไม่มี data-label ให้แสดงกึ่งกลางเต็มแถวตามเดิม ไม่ใช่ชิดขวา */
+            .mobile-stack-table td:not([data-label]) { display: block; text-align: center !important; }
+        }
     </style>
 </head>
 <body class="min-h-screen p-3 md:p-6">
@@ -231,7 +278,7 @@
                     <button onclick="addItemToFolder()" id="addItemBtn" class="btn-pop mt-3 w-full bg-slate-900 text-white font-bold text-sm py-2.5 px-4 rounded-xl cursor-pointer hover:bg-slate-800 transition">เพิ่มเข้าแฟ้ม</button>
                 </div>
 
-                <div class="overflow-x-auto mb-6 rounded-2xl border-2 border-slate-900">
+                <div class="overflow-x-auto mb-6 rounded-2xl border-2 border-slate-900 mobile-stack-table">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="brand-yellow text-slate-900 text-xs font-bold uppercase tracking-wider border-b-2 border-slate-900">
@@ -291,7 +338,7 @@
                     </div>
                 </div>
 
-                <div class="overflow-x-auto rounded-2xl border-2 border-slate-900">
+                <div class="overflow-x-auto rounded-2xl border-2 border-slate-900 mobile-stack-table">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="brand-yellow text-slate-900 text-xs font-bold uppercase tracking-wider border-b-2 border-slate-900">
@@ -396,7 +443,7 @@
             console.error("Fetch MasterDb Error:", e);
             const tbody = document.getElementById('dbTableList');
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-500 font-bold">⚠️ โหลดข้อมูลคลังพัสดุไม่สำเร็จ: ${e.message || e}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-500 font-bold">⚠️ โหลดข้อมูลคลังพัสดุไม่สำเร็จ: ${e.message || e}</td></tr>`;
             }
         }
     }
@@ -525,11 +572,11 @@
                 byCategory[category] = (byCategory[category] || 0) + itemWeight;
                 htmlContent += `
                     <tr style="animation-delay:${Math.min(index, 14) * 30}ms" class="row-fade hover:bg-slate-50 transition-colors">
-                        <td class="p-3 text-slate-900">${safeStr(item.name)}</td>
-                        <td class="p-3 text-center text-slate-700">${category}</td>
-                        <td class="p-3 text-center text-slate-700">${safeStr(item.qty)}</td>
-                        <td class="p-3 text-right font-bold text-slate-900">${itemWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                        <td class="p-3 text-center no-print">
+                        <td class="p-3 text-slate-900" data-label="รหัส / รายการพัสดุ">${safeStr(item.name)}</td>
+                        <td class="p-3 text-center text-slate-700" data-label="ประเภท">${category}</td>
+                        <td class="p-3 text-center text-slate-700" data-label="จำนวนรื้อถอน">${safeStr(item.qty)}</td>
+                        <td class="p-3 text-right font-bold text-slate-900" data-label="น้ำหนักรวม (กก.)">${itemWeight.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="p-3 text-center no-print" data-label="จัดการ">
                             <button onclick="removeItemFromFolder(${index})" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110">ลบ</button>
                         </td>
                     </tr>
@@ -922,7 +969,7 @@
         }
 
         if(filteredDb.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ไม่พบรายการพัสดุที่ค้นหา</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 font-bold">ไม่พบรายการพัสดุที่ค้นหา</td></tr>`;
             return;
         }
 
@@ -937,12 +984,12 @@
             // ป้องกันแอปพังทั้งหน้าถ้ามีรายการในคลังที่ไม่มี unitWeight เป็นตัวเลข (ข้อมูลเพี้ยน)
             htmlContent += `
                 <tr style="animation-delay:${Math.min(i, 14) * 25}ms" class="row-fade hover:bg-slate-50 transition-colors">
-                    <td class="p-3 text-center">${imgTag}</td>
-                    <td class="p-3 font-bold text-slate-900">${safeStr(d.code)}</td>
-                    <td class="p-3 text-slate-800">${safeStr(d.name)}</td>
-                    <td class="p-3 text-center text-slate-700">${itemCategory(d)}</td>
-                    <td class="p-3 text-right font-bold text-slate-900">${safeNum(d.unitWeight).toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
-                    <td class="p-3 text-center">
+                    <td class="p-3 text-center" data-label="รูปภาพ">${imgTag}</td>
+                    <td class="p-3 font-bold text-slate-900" data-label="รหัสพัสดุ">${safeStr(d.code)}</td>
+                    <td class="p-3 text-slate-800" data-label="ชื่อพัสดุ">${safeStr(d.name)}</td>
+                    <td class="p-3 text-center text-slate-700" data-label="ประเภท">${itemCategory(d)}</td>
+                    <td class="p-3 text-right font-bold text-slate-900" data-label="น้ำหนัก/หน่วย (กก.)">${safeNum(d.unitWeight).toLocaleString(undefined, {minimumFractionDigits: 3})}</td>
+                    <td class="p-3 text-center" data-label="จัดการ">
                         <button onclick="editDbItem('${d.id}')" class="text-amber-600 hover:text-amber-700 font-bold text-xs mr-2 cursor-pointer transition hover:scale-110 inline-block">แก้ไข</button>
                         <button onclick="deleteDbItem('${d.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs cursor-pointer transition hover:scale-110 inline-block">ลบ</button>
                     </td>
