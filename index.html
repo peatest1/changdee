@@ -635,7 +635,11 @@
 
         if (!name) return alert('กรุณาค้นหาและเลือกพัสดุจากคลังก่อน');
 
-        const found = masterDb.find(d => codesMatch(d.code, name) || (d.code && name.includes(d.code)));
+        // ใช้รหัสที่อยู่ในวงเล็บ [ ] ถ้ามี (มาจากตอนเลือกรายการ) ไม่งั้นใช้ข้อความทั้งหมดที่พิมพ์
+        // จับคู่แบบตรงเป๊ะเท่านั้น เพื่อกันไม่ให้เผลอเพิ่มพัสดุผิดตัวที่มีรหัสขึ้นต้นเหมือนกัน
+        const codeMatch = name.match(/^\[(.*?)\]/);
+        const codePart = codeMatch ? codeMatch[1] : name;
+        const found = masterDb.find(d => normalizeCode(d.code) === normalizeCode(codePart));
         if (!found) return alert('ไม่พบรหัสพัสดุนี้ในคลัง กรุณาเลือกจากรายการที่ขึ้นให้ หรือเพิ่มพัสดุนี้เข้าคลังก่อน');
 
         // น้ำหนักรวมและประเภท ดึงจากคลังพัสดุเสมอ ไม่รับค่าที่ผู้ใช้กรอกเอง
@@ -698,9 +702,12 @@
             return;
         }
 
+        // ขณะพิมพ์ ให้จับคู่เฉพาะรหัสที่ตรงกันเป๊ะ หรือข้อความที่ตรงกับตัวเลือกในดรอปดาวน์แบบเป๊ะๆ เท่านั้น
+        // (ไม่ใช้การจับคู่แบบคาดเดา/ขึ้นต้นเดียวกัน เพราะจะทำให้ล็อกไปพัสดุอื่นก่อนพิมพ์ครบ เนื่องจากรหัสพัสดุหลายตัวขึ้นต้นเหมือนกัน)
+        const normVal = normalizeCode(val);
         const found = masterDb.find(d => {
             const fullText = `[${safeStr(d.code)}] ${safeStr(d.name)}`.toLowerCase();
-            return codesMatch(d.code, val) || fullText === val.toLowerCase();
+            return normalizeCode(d.code) === normVal || fullText === val.toLowerCase();
         });
 
         if (found) {
