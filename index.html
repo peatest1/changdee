@@ -197,12 +197,29 @@
                 </div>
             </div>
 
+            <!-- PAGE 1.5: โครงข่ายภายในแฟ้มงาน (ชั้นกลางระหว่างแฟ้มงานกับรายการพัสดุ) -->
+            <div id="pageNetworks" class="hidden">
+                <button onclick="navTo('folders')" class="text-xs font-bold text-slate-600 hover:text-slate-900 mb-1 inline-block transition hover:-translate-x-0.5">← กลับไปเลือกแฟ้มงาน</button>
+                <h2 class="text-xl font-bold text-slate-900 mb-6" id="networksFolderName">แฟ้มงาน: -</h2>
+
+                <div class="mb-6 brand-yellow-light p-4 rounded-2xl border-2 border-slate-900">
+                    <h3 class="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1">➕ สร้างโครงข่ายใหม่</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="newNetworkName" placeholder="กรอกชื่อโครงข่าย..." onkeydown="if(event.key==='Enter'){event.preventDefault();createNetwork();}" class="flex-1 px-4 py-2.5 bg-white border-2 border-slate-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-sm">
+                        <button onclick="createNetwork()" id="createNetworkBtn" class="btn-pop brand-yellow text-slate-900 border-2 border-slate-900 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-400 cursor-pointer transition shadow-[2px_2px_0px_0px_rgba(30,41,59,1)] active:translate-x-0.5 active:translate-y-0.5">สร้างโครงข่าย</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="networksList"></div>
+            </div>
+
             <!-- PAGE 2: หน้าคำนวณ -->
             <div id="pageCalc" class="hidden">
                 <div class="flex justify-between items-center mb-6 pb-3 border-b-2 border-slate-200">
                     <div>
-                        <button onclick="navTo('folders')" class="text-xs font-bold text-slate-600 hover:text-slate-900 mb-1 inline-block no-print transition hover:-translate-x-0.5">← กลับไปเลือกแฟ้มงาน</button>
-                        <h2 class="text-xl font-bold text-slate-900" id="calcFolderName">แฟ้มงาน: -</h2>
+                        <button onclick="navTo('networks')" class="text-xs font-bold text-slate-600 hover:text-slate-900 mb-1 inline-block no-print transition hover:-translate-x-0.5">← กลับไปเลือกโครงข่าย</button>
+                        <p class="text-xs font-semibold text-slate-500" id="calcFolderBreadcrumb">แฟ้มงาน: -</p>
+                        <h2 class="text-xl font-bold text-slate-900" id="calcFolderName">โครงข่าย: -</h2>
                     </div>
                     <button onclick="window.print()" class="btn-pop no-print px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-800 transition">🖨️ พิมพ์ / บันทึก PDF</button>
                 </div>
@@ -363,6 +380,7 @@
     let folders = [];
     let masterDb = [];
     let currentFolderId = null;
+    let currentNetworkId = null; // โครงข่าย (ชั้นย่อยภายในแฟ้มงาน) ที่กำลังเปิดดูอยู่
     let selectedUnitWeight = 0;
     let selectedCategory = null; // ประเภทของพัสดุที่กำลังเลือกอยู่ ดึงมาจากคลังพัสดุโดยอัตโนมัติ (ไม่ให้ผู้ใช้กรอกเอง)
     
@@ -394,7 +412,8 @@
         folders = [];
         snapshot.forEach(doc => folders.push({ id: doc.id, ...doc.data() }));
         if (!document.getElementById('pageFolders').classList.contains('hidden')) renderFolders();
-        if (currentFolderId && !document.getElementById('pageCalc').classList.contains('hidden')) renderCalcView();
+        if (currentFolderId && !document.getElementById('pageNetworks').classList.contains('hidden')) renderNetworks();
+        if (currentFolderId && currentNetworkId && !document.getElementById('pageCalc').classList.contains('hidden')) renderCalcView();
     }, error => {
         console.error("Firestore Folders Error:", error);
         const container = document.getElementById('foldersList');
@@ -431,6 +450,7 @@
 
     function navTo(page) {
         document.getElementById('pageFolders').classList.add('hidden');
+        document.getElementById('pageNetworks').classList.add('hidden');
         document.getElementById('pageCalc').classList.add('hidden');
         document.getElementById('pageDb').classList.add('hidden');
 
@@ -443,6 +463,12 @@
             playPageAnim(el);
             document.getElementById('navFoldersBtn').className = "btn-pop flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
             renderFolders();
+        } else if(page === 'networks') {
+            const el = document.getElementById('pageNetworks');
+            el.classList.remove('hidden');
+            playPageAnim(el);
+            document.getElementById('navFoldersBtn').className = "btn-pop flex-1 sm:flex-initial px-5 py-2.5 font-bold text-sm rounded-xl border-2 border-slate-900 bg-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(245,184,55,1)] cursor-pointer transition active:translate-y-0.5";
+            renderNetworks();
         } else if(page === 'db') {
             const el = document.getElementById('pageDb');
             el.classList.remove('hidden');
@@ -466,10 +492,10 @@
         btn.disabled = true;
         btn.innerText = 'กำลังสร้าง...';
         try {
-            await db.collection('folders').add({ 
-                name: name, 
-                items: [], 
-                createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+            await db.collection('folders').add({
+                name: name,
+                networks: [], // แฟ้มงานมีโครงข่ายได้หลายอัน แต่ละโครงข่ายค่อยมีรายการพัสดุของตัวเอง
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             nameInput.value = '';
         } catch(e) { console.error(e); alert('เกิดข้อผิดพลาดในการสร้างแฟ้ม: ' + (e.message || e)); }
@@ -478,7 +504,8 @@
 
     function openFolder(id) {
         currentFolderId = id;
-        navTo('calc');
+        currentNetworkId = null;
+        navTo('networks');
     }
 
     async function deleteFolder(id) {
@@ -487,6 +514,13 @@
                 await db.collection('folders').doc(id).delete();
             } catch(e) { console.error(e); alert('ลบแฟ้มงานไม่สำเร็จ: ' + (e.message || e)); }
         }
+    }
+
+    // ดึงรายการโครงข่ายของแฟ้มงาน รองรับแฟ้มงานเก่าที่ยังเป็นระบบเดิม (มี items ตรงๆ ไม่มีโครงข่าย)
+    function getFolderNetworks(f) {
+        if (f.networks) return f.networks;
+        if (f.items && f.items.length > 0) return [{ id: 'net_legacy', name: 'รายการหลัก', items: f.items }];
+        return [];
     }
 
     function renderFolders() {
@@ -498,9 +532,10 @@
 
         let htmlContent = '';
         folders.forEach((f, i) => {
+            const networks = getFolderNetworks(f);
             // ป้องกันแอปพังถ้ามีรายการที่ weight ไม่ใช่ตัวเลข (ข้อมูลเพี้ยน) จนรวมยอดออกมาเป็น NaN
-            const totalWeight = f.items ? f.items.reduce((sum, item) => sum + safeNum(item.weight), 0) : 0;
-            const itemLength = f.items ? f.items.length : 0;
+            const totalWeight = networks.reduce((sum, n) => sum + (n.items || []).reduce((s, item) => s + safeNum(item.weight), 0), 0);
+            const networkCount = networks.length;
             const folderName = safeStr(f.name) || '(ไม่มีชื่อ)';
             htmlContent += `
                 <div style="animation-delay:${Math.min(i, 12) * 45}ms" class="card-pop folder-card border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] transition flex flex-col justify-between">
@@ -509,11 +544,11 @@
                             <h3 class="font-bold text-slate-900 text-base leading-tight">${folderName}</h3>
                             <button onclick="deleteFolder('${f.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold whitespace-nowrap ml-2 cursor-pointer transition hover:scale-110">ลบ</button>
                         </div>
-                        <p class="text-xs font-semibold text-slate-500 mb-4">${itemLength} รายการ</p>
+                        <p class="text-xs font-semibold text-slate-500 mb-4">${networkCount} โครงข่าย</p>
                     </div>
                     <div class="flex justify-between items-center pt-3 border-t-2 border-slate-100">
                         <span class="text-sm font-black text-slate-900">${totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2})} กก.</span>
-                        <button onclick="openFolder('${f.id}')" class="btn-pop px-3 py-1.5 brand-yellow border-2 border-slate-900 text-slate-900 rounded-xl text-xs font-bold cursor-pointer hover:bg-amber-400 transition">เปิดคำนวณ →</button>
+                        <button onclick="openFolder('${f.id}')" class="btn-pop px-3 py-1.5 brand-yellow border-2 border-slate-900 text-slate-900 rounded-xl text-xs font-bold cursor-pointer hover:bg-amber-400 transition">เปิด →</button>
                     </div>
                 </div>
             `;
@@ -521,27 +556,125 @@
         container.innerHTML = htmlContent;
     }
 
+    // ===== ชั้นโครงข่าย (อยู่ระหว่างแฟ้มงาน กับ รายการพัสดุ) =====
+
+    function getCurrentFolder() { return folders.find(f => f.id === currentFolderId); }
+
+    function getCurrentNetwork() {
+        const folder = getCurrentFolder();
+        if (!folder) return null;
+        return getFolderNetworks(folder).find(n => n.id === currentNetworkId) || null;
+    }
+
+    async function createNetwork() {
+        const nameInput = document.getElementById('newNetworkName');
+        const name = nameInput.value.trim();
+        const btn = document.getElementById('createNetworkBtn');
+        if (!name) return alert('กรุณากรอกชื่อโครงข่าย');
+        const folder = getCurrentFolder();
+        if (!folder) return alert('ไม่พบแฟ้มงานนี้ กรุณากลับไปเลือกแฟ้มงานใหม่');
+
+        btn.disabled = true;
+        btn.innerText = 'กำลังสร้าง...';
+        try {
+            const newNetwork = { id: 'net_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, items: [] };
+            const networks = [...getFolderNetworks(folder), newNetwork];
+            await db.collection('folders').doc(currentFolderId).update({ networks });
+            nameInput.value = '';
+        } catch(e) { console.error(e); alert('สร้างโครงข่ายไม่สำเร็จ: ' + (e.message || e)); }
+        finally { btn.disabled = false; btn.innerText = 'สร้างโครงข่าย'; }
+    }
+
+    function openNetwork(id) {
+        currentNetworkId = id;
+        navTo('calc');
+    }
+
+    async function deleteNetwork(id) {
+        if (!confirm('ต้องการลบโครงข่ายนี้ใช่หรือไม่? ข้อมูลจะถูกลบถาวร')) return;
+        const folder = getCurrentFolder();
+        if (!folder) return;
+        try {
+            const networks = getFolderNetworks(folder).filter(n => n.id !== id);
+            await db.collection('folders').doc(currentFolderId).update({ networks });
+        } catch(e) { console.error(e); alert('ลบโครงข่ายไม่สำเร็จ: ' + (e.message || e)); }
+    }
+
+    function renderNetworks() {
+        const folder = getCurrentFolder();
+        if (!folder) return navTo('folders');
+
+        document.getElementById('networksFolderName').innerText = `แฟ้มงาน: ${safeStr(folder.name)}`;
+        const networks = getFolderNetworks(folder);
+        const container = document.getElementById('networksList');
+
+        // แฟ้มงานเก่าที่ยังไม่มีฟิลด์ networks แต่มี items เดิมอยู่ ให้ย้ายเข้าโครงสร้างใหม่ให้อัตโนมัติครั้งเดียว ไม่ให้ข้อมูลหาย
+        if (!folder.networks) {
+            db.collection('folders').doc(folder.id).update({ networks }).catch(e => console.error('Migrate networks failed:', e));
+        }
+
+        if (networks.length === 0) {
+            container.innerHTML = `<div class="col-span-full text-center text-slate-400 font-bold py-12">ยังไม่มีโครงข่ายในแฟ้มงานนี้ กรุณาสร้างโครงข่ายใหม่</div>`;
+            return;
+        }
+
+        let htmlContent = '';
+        networks.forEach((n, i) => {
+            const totalWeight = (n.items || []).reduce((sum, item) => sum + safeNum(item.weight), 0);
+            const itemLength = (n.items || []).length;
+            const netName = safeStr(n.name) || '(ไม่มีชื่อ)';
+            htmlContent += `
+                <div style="animation-delay:${Math.min(i, 12) * 45}ms" class="card-pop folder-card border-2 border-slate-900 rounded-2xl p-4 bg-white shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-slate-900 text-base leading-tight">${netName}</h3>
+                            <button onclick="deleteNetwork('${n.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold whitespace-nowrap ml-2 cursor-pointer transition hover:scale-110">ลบ</button>
+                        </div>
+                        <p class="text-xs font-semibold text-slate-500 mb-4">${itemLength} รายการ</p>
+                    </div>
+                    <div class="flex justify-between items-center pt-3 border-t-2 border-slate-100">
+                        <span class="text-sm font-black text-slate-900">${totalWeight.toLocaleString(undefined, {minimumFractionDigits: 2})} กก.</span>
+                        <button onclick="openNetwork('${n.id}')" class="btn-pop px-3 py-1.5 brand-yellow border-2 border-slate-900 text-slate-900 rounded-xl text-xs font-bold cursor-pointer hover:bg-amber-400 transition">เปิดคำนวณ →</button>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = htmlContent;
+    }
+
+    // บันทึกรายการพัสดุใหม่กลับเข้าไปในโครงข่ายปัจจุบัน (เขียนทับทั้งอาร์เรย์ networks ของแฟ้มงาน)
+    async function updateCurrentNetworkItems(newItems) {
+        const folder = getCurrentFolder();
+        if (!folder) throw new Error('ไม่พบแฟ้มงานนี้');
+        const networks = getFolderNetworks(folder).map(n => n.id === currentNetworkId ? { ...n, items: newItems } : n);
+        await db.collection('folders').doc(currentFolderId).update({ networks });
+    }
+
     // ประเภทพัสดุเริ่มต้นสำหรับรายการเก่าที่ยังไม่มีฟิลด์ category (ข้อมูลก่อนหน้านี้ทั้งหมดถูกนับเป็นเศษเหล็กอยู่แล้ว)
     const DEFAULT_CATEGORY = 'เศษเหล็ก';
     function itemCategory(item) { return safeStr(item.category) || DEFAULT_CATEGORY; }
 
     function renderCalcView() {
-        const folder = folders.find(f => f.id === currentFolderId);
+        const folder = getCurrentFolder();
         if(!folder) return navTo('folders');
+        const network = getCurrentNetwork();
+        if(!network) return navTo('networks');
 
-        document.getElementById('calcFolderName').innerText = `แฟ้มงาน: ${safeStr(folder.name)}`;
+        document.getElementById('calcFolderBreadcrumb').innerText = `แฟ้มงาน: ${safeStr(folder.name)}`;
+        document.getElementById('calcFolderName').innerText = `โครงข่าย: ${safeStr(network.name)}`;
         const tbody = document.getElementById('calcItemList'); // มือถือ: ลิสต์กระชับ
         const tableBody = document.getElementById('calcItemTableBody'); // PC: ตารางใหญ่
         let totalWeight = 0;
         const byCategory = {}; // ยอดน้ำหนักแยกตามประเภท เช่น { 'เศษเหล็ก': 120.5, 'เศษสาย': 30 }
+        const items = network.items || [];
 
-        if(!folder.items || folder.items.length === 0) {
-            tbody.innerHTML = `<div class="p-6 text-center text-slate-400 font-bold text-sm">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</div>`;
-            if (tableBody) tableBody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในแฟ้มงานนี้</td></tr>`;
+        if(items.length === 0) {
+            tbody.innerHTML = `<div class="p-6 text-center text-slate-400 font-bold text-sm">ยังไม่มีรายการพัสดุในโครงข่ายนี้</div>`;
+            if (tableBody) tableBody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold">ยังไม่มีรายการพัสดุในโครงข่ายนี้</td></tr>`;
         } else {
             let htmlContent = '';
             let tableContent = '';
-            folder.items.forEach((item, index) => {
+            items.forEach((item, index) => {
                 const itemWeight = safeNum(item.weight);
                 const category = itemCategory(item);
                 const catColor = category === 'เศษสาย' ? 'text-teal-700' : 'text-slate-500';
@@ -623,8 +756,10 @@
     }
 
     async function addItemToFolder() {
-        const folder = folders.find(f => f.id === currentFolderId);
+        const folder = getCurrentFolder();
         if (!folder) { alert('ไม่พบแฟ้มงานนี้ กรุณากลับไปเลือกแฟ้มงานใหม่'); return navTo('folders'); }
+        const network = getCurrentNetwork();
+        if (!network) { alert('ไม่พบโครงข่ายนี้ กรุณากลับไปเลือกโครงข่ายใหม่'); return navTo('networks'); }
 
         const nameInput = document.getElementById('calcItemName');
         const qtyInput = document.getElementById('calcItemQty');
@@ -656,9 +791,9 @@
         btn.disabled = true;
         btn.innerText = 'กำลังเพิ่ม...';
         try {
-            const existingItems = folder.items || [];
+            const existingItems = network.items || [];
             const newItems = [...existingItems, { name, qty, weight, category }];
-            await db.collection('folders').doc(currentFolderId).update({ items: newItems });
+            await updateCurrentNetworkItems(newItems);
 
             nameInput.value = '';
             qtyInput.value = '1';
@@ -686,11 +821,11 @@
     }
 
     async function removeItemFromFolder(index) {
-        const folder = folders.find(f => f.id === currentFolderId);
-        if (!folder || !folder.items) return;
-        const newItems = folder.items.filter((_, i) => i !== index);
+        const network = getCurrentNetwork();
+        if (!network || !network.items) return;
+        const newItems = network.items.filter((_, i) => i !== index);
         try {
-            await db.collection('folders').doc(currentFolderId).update({ items: newItems });
+            await updateCurrentNetworkItems(newItems);
         } catch(e) { console.error(e); alert('ลบรายการไม่สำเร็จ: ' + (e.message || e)); }
     }
 
@@ -827,8 +962,10 @@
         const fileInput = document.getElementById('scanDocInput');
         if(!fileInput.files || !fileInput.files[0]) return alert('กรุณาเลือกหรือถ่ายรูปภาพเอกสารก่อนครับ');
 
-        const folder = folders.find(f => f.id === currentFolderId);
+        const folder = getCurrentFolder();
         if (!folder) return alert('ไม่พบแฟ้มงานนี้ กรุณากลับไปเลือกแฟ้มงานใหม่');
+        const network = getCurrentNetwork();
+        if (!network) return alert('ไม่พบโครงข่ายนี้ กรุณากลับไปเลือกโครงข่ายใหม่');
 
         const statusEl = document.getElementById('scanStatus');
         const scanBtn = document.getElementById('scanBtn');
@@ -904,8 +1041,8 @@
                 addedCount++;
             });
 
-            const existingItems = folder.items || [];
-            await db.collection('folders').doc(currentFolderId).update({ items: [...existingItems, ...newItemsToAdd] });
+            const existingItems = network.items || [];
+            await updateCurrentNetworkItems([...existingItems, ...newItemsToAdd]);
             statusEl.innerText = `✅ เพิ่มรายการจากสแกนสำเร็จ ${addedCount} รายการ`;
 
         } catch (err) {
