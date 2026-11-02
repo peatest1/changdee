@@ -255,9 +255,10 @@
                     <h3 class="text-sm font-bold text-slate-900 mb-3">➕ เพิ่มรายการด้วยมือ</h3>
                     <!-- น้ำหนักต่อหน่วยและประเภทดึงมาจากคลังพัสดุอัตโนมัติตามรหัสที่เลือก ผู้ใช้กรอกแค่พัสดุและจำนวนเท่านั้น -->
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                        <div class="md:col-span-9">
-                            <input type="text" id="calcItemName" list="masterDatalist" placeholder="ค้นหารหัส/ชื่อพัสดุ..." oninput="onItemSelect(this.value)" onkeydown="handleNameKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium focus:outline-none">
-                            <datalist id="masterDatalist"></datalist>
+                        <div class="md:col-span-9 relative">
+                            <input type="text" id="calcItemName" autocomplete="off" placeholder="ค้นหารหัส/ชื่อพัสดุ..." oninput="onItemSelect(this.value)" onfocus="onItemSelect(this.value)" onblur="setTimeout(hideItemSuggestions, 150)" onkeydown="handleNameKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium focus:outline-none">
+                            <!-- รายการพัสดุที่ตรงกับข้อความที่พิมพ์ ให้กดเลือกได้เลยแม้พิมพ์ไม่ครบ (ทำเองแทน <datalist> เพราะ Safari บน iPhone ไม่รองรับ) -->
+                            <div id="calcItemSuggestions" class="hidden absolute z-20 left-0 right-0 mt-1 bg-white border-2 border-slate-900 rounded-xl shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] max-h-60 overflow-y-auto"></div>
                         </div>
                         <div class="md:col-span-3">
                             <input type="number" id="calcItemQty" placeholder="จำนวน" value="1" oninput="updateCalcItemPreview()" onkeydown="handleQtyKeydown(event)" class="w-full px-3 py-2 bg-white border-2 border-slate-900 rounded-xl text-sm font-medium">
@@ -440,7 +441,6 @@
             masterDb = [];
             snapshot.forEach(doc => masterDb.push({ id: doc.id, ...doc.data() }));
             if (!document.getElementById('pageDb').classList.contains('hidden')) renderMasterDb();
-            updateDatalist();
         } catch (e) {
             console.error("Fetch MasterDb Error:", e);
             const errMsg = `⚠️ โหลดข้อมูลคลังพัสดุไม่สำเร็จ: ${e.message || e}`;
@@ -845,6 +845,7 @@
             selectedUnitWeight = 0;
             selectedCategory = null;
             updateCalcItemPreview();
+            hideItemSuggestions();
             return;
         }
 
@@ -865,6 +866,57 @@
             selectedCategory = null;
         }
         updateCalcItemPreview();
+        renderItemSuggestions(val);
+    }
+
+    // หารายการในคลังพัสดุที่รหัสหรือชื่อ "มีส่วนที่ตรงกับ" ข้อความที่พิมพ์อยู่ (ไม่ต้องพิมพ์ครบ/ไม่ต้องขึ้นต้นเหมือนกัน)
+    // ใช้แสดงเป็นตัวเลือกให้กดเลือกเท่านั้น ไม่ได้ใช้ล็อกค่าน้ำหนัก/ประเภทโดยตรง (ส่วนนั้นยังคงต้องจับคู่แบบเป๊ะอยู่)
+    function filterMasterDbSuggestions(val) {
+        const normVal = normalizeCode(val);
+        const lowerVal = val.toLowerCase();
+        return masterDb.filter(d => {
+            const normCode = normalizeCode(d.code);
+            const lowerName = safeStr(d.name).toLowerCase();
+            return (normVal && normCode.includes(normVal)) || (lowerVal && lowerName.includes(lowerVal));
+        }).slice(0, 8);
+    }
+
+    function renderItemSuggestions(val) {
+        const box = document.getElementById('calcItemSuggestions');
+        if (!box) return;
+        const trimmed = val.trim();
+        if (!trimmed) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+
+        const matches = filterMasterDbSuggestions(trimmed);
+        if (matches.length === 0) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+
+        box.innerHTML = matches.map(d => `
+            <div onmousedown="event.preventDefault(); selectMasterDbItem('${d.id}')" class="px-3 py-2 cursor-pointer hover:bg-amber-50 border-b border-slate-100 last:border-b-0 transition-colors">
+                <div class="text-sm font-bold text-slate-900">${safeStr(d.code)}</div>
+                <div class="text-xs text-slate-500">${safeStr(d.name)}</div>
+            </div>
+        `).join('');
+        box.classList.remove('hidden');
+    }
+
+    function hideItemSuggestions() {
+        const box = document.getElementById('calcItemSuggestions');
+        if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+    }
+
+    // ตอนกดเลือกพัสดุจากรายการแนะนำ: เติมข้อความ ล็อกน้ำหนัก/ประเภท แล้วพาไปกรอกจำนวนต่อ
+    function selectMasterDbItem(id) {
+        const found = masterDb.find(d => d.id === id);
+        if (!found) return;
+        const nameInput = document.getElementById('calcItemName');
+        nameInput.value = `[${safeStr(found.code)}] ${safeStr(found.name)}`;
+        selectedUnitWeight = safeNum(found.unitWeight);
+        selectedCategory = itemCategory(found);
+        updateCalcItemPreview();
+        hideItemSuggestions();
+        const qtyInput = document.getElementById('calcItemQty');
+        qtyInput.focus();
+        qtyInput.select();
     }
 
     // แสดงตัวอย่างน้ำหนักรวม/ประเภทที่จะถูกดึงมาจากคลังพัสดุ ให้ผู้ใช้เห็นก่อนกดเพิ่ม (อ่านอย่างเดียว แก้ไม่ได้ตรงนี้)
@@ -1229,17 +1281,7 @@
         document.getElementById('cancelEditBtn').classList.add('hidden');
     }
 
-    function updateDatalist() {
-        const list = document.getElementById('masterDatalist');
-        list.innerHTML = '';
-        masterDb.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = `[${safeStr(d.code)}] ${safeStr(d.name)}`;
-            list.appendChild(opt);
-        });
-    }
-
-    function openModal(id) {
+function openModal(id) {
         const item = masterDb.find(d => d.id === id);
         if (!item) return;
         document.getElementById('modalTitle').innerText = `[${safeStr(item.code)}] ${safeStr(item.name)}`;
