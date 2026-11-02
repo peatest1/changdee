@@ -145,6 +145,17 @@
             }
         }
 
+        /* ===== กันโลโก้/ชื่อแอปโดนติ่ง (Dynamic Island) หรือสถานะบาร์ของ iPhone บังตอนเปิดแบบ PWA เต็มจอ =====
+           พื้นหลังสีเหลืองของ header ยังเต็มไปจนถึงขอบจอเหมือนเดิม แค่ดันเนื้อหาด้านในลงมาพ้นพื้นที่ติ่ง/สถานะบาร์ */
+        header.brand-yellow {
+            padding-top: calc(1rem + env(safe-area-inset-top));
+        }
+        .app-shell {
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
         /* ===== รายการพัสดุ/คลังพัสดุ: ลิสต์แบบ 2 บรรทัดต่อรายการ ไม่มีเส้นแบ่งในรายการ มีแค่เส้นบางๆคั่นระหว่างรายการ ===== */
         .item-row-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
